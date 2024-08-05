@@ -10,6 +10,8 @@ mod routers;
 mod state;
 #[path ="../files/mod.rs"]
 mod files;
+#[path ="../models/fileInfo.rs"]
+mod models;
 
 use routers::*;
 use state::AppState;
@@ -31,7 +33,7 @@ async fn main() -> io::Result<()> {
         App::new()
             .app_data(shared_data.clone()) // 将数据绑定到内存中
             .configure(general_routers)
-        // .configure(course_routes)
+            .configure(file_routes)
     };
 
     HttpServer::new(app).bind("127.0.0.1:3000")?.run().await

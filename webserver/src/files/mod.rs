@@ -1,2 +1,2 @@
-pub mod handler_zip_file;
+pub mod file_handler;
 pub mod zip_extract;
