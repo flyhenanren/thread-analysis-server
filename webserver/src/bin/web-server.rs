@@ -10,7 +10,7 @@ mod routers;
 mod state;
 #[path ="../files/mod.rs"]
 mod files;
-#[path ="../models/fileInfo.rs"]
+#[path ="../models/mod.rs"]
 mod models;
 
 use routers::*;

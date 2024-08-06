@@ -1,4 +1,4 @@
-use crate::handlers::{general::*, thread_file::*};
+use crate::handlers::{general::*, file_handle::*};
 use actix_web::web;
 
 

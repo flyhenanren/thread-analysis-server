@@ -3,10 +3,9 @@ use std::{
     io::{self, Read},
 };
 use std::path::Path;
-use crate::files::zip_extract;
+use crate::{models::file_info::FileInfo, files::zip_extract};
 
-// 解压文件
-pub fn unzip_file(path: &str) {
+pub fn analysis(path: &str)  -> io::Result<Vec<FileInfo>> {
     let valid: bool = valid_file_type(path).map_err(|e| {
         panic!("文件类型校验时发生错误：{}", e);
     }).unwrap();
@@ -14,8 +13,8 @@ pub fn unzip_file(path: &str) {
         panic!("不支持的文件类型：{}", path);
     }
     let source_path = Path::new(path);
-    
-    let _ = zip_extract::extract_file(&source_path);
+    let file_info = zip_extract::unzip_and_extract_file(&source_path);
+    file_info
 }
 
 fn valid_file_type(path: &str) -> Result<bool, io::Error> {
@@ -73,7 +72,7 @@ fn check_file_type(buffer: &[u8; 5]) -> bool {
 mod tests {
     use actix_web::dev::Path;
 
-    use super::{unzip_file, valid_file_type};
+    use super::{analysis, valid_file_type};
 
     #[test]
     fn test_zip_type() {
@@ -84,6 +83,9 @@ mod tests {
     #[test]
     fn test_unzip(){
         let path = Path::new("D:\\dump\\20240726XNJK[非涉密].zip");
-        unzip_file(path.as_str())
+        let file_info = analysis(path.as_str());
+        for ele in file_info.unwrap().iter() {
+            println!("{:?}",ele)
+        }
     }
 }
