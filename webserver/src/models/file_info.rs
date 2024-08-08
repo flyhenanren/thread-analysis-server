@@ -1,10 +1,11 @@
 use actix_web::web;
 use regex::Regex;
 use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
 
 use crate::models::config::EnvVars;
 
-#[derive(Debug, Clone)]
+#[derive(Serialize,Deserialize, Debug, Clone)]
 pub struct FileInfo {
     pub path: String,
     pub file_type: FileType,
@@ -47,7 +48,7 @@ impl FileInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum FileType {
     CpuThread,
     CpuTop,
@@ -67,5 +68,12 @@ impl FileType {
             name if name.contains(&env.gc) => FileType::Gc,
             _ => FileType::None,
         }
+    }
+}
+
+
+impl From<web::Json<FileType>> for FileType{
+    fn from(file_type: web::Json<FileType>) -> Self {
+        file_type.into_inner()
     }
 }
