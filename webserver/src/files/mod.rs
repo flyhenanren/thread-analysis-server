@@ -1,2 +1,2 @@
-pub mod zip_analysis;
+pub mod file_analysis;
 pub mod zip_extract;
