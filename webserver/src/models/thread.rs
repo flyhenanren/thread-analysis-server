@@ -3,7 +3,7 @@ use std::str::FromStr;
 use serde::Serialize;
 // "JOB_BI_JOB_THREAD_8" #488 prio=5 os_prio=0 tid=0x0000fffb30011000 nid=0xf1d43 runnable [0x0000fff7575fd000]
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, PartialEq)]
 pub struct Thread {
     id: String,
     name: String,
@@ -12,11 +12,18 @@ pub struct Thread {
     tid: u64,
     nid: u64,
     status: ThreadStatus,
+    frames: Vec<CallFrame>,
 }
 
 impl Thread {
-    pub fn new(info: &str, status: &str) -> Self {
-        let infos: Vec<&str> = info.split_whitespace().collect();
+    pub fn new(lines: Vec<&str>) -> Self {
+        let infos: Vec<&str> = lines[0].split_whitespace().collect();
+        let status = ThreadStatus::from_str(lines[1]).unwrap();
+        let call_info = &lines[2..=lines.len() - 1];
+        let mut frames: Vec<CallFrame> = Vec::with_capacity(call_info.len());
+        for call in call_info {
+            frames.push(CallFrame::new(&call));
+        }
         Thread {
             id: infos[1].to_string(),
             name: infos[0].to_string(),
@@ -24,102 +31,276 @@ impl Thread {
             os_prio: infos[3].split("=").nth(1).unwrap().parse::<u32>().unwrap(),
             tid: infos[4].split("=").nth(1).unwrap().parse::<u64>().unwrap(),
             nid: infos[5].split("=").nth(1).unwrap().parse::<u64>().unwrap(),
-            status: ThreadStatus::from_str(status).unwrap(),
+            status,
+            frames,
         }
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug,PartialEq)]
 pub enum ThreadStatus {
-    NEW,
-    RUNNABLE,
-    BLOCKED,
-    WAITING,
-    TIMED_WAITING,
-    TERMINATED,
+    Runnable,
+    Blocked,
+    Waiting,
+    TimedWaiting,
+    Terminated,
+    New,
 }
 
 impl FromStr for ThreadStatus {
     type Err = ();
     fn from_str(str: &str) -> Result<Self, Self::Err> {
-        if let Some((state, info)) = str.split_once('(') {
-            let state = state.trim();
-            let _info = info.trim_end_matches(')').trim();
-            match state {
-                "NEW" => Ok(ThreadStatus::NEW),
-                "WAITING" => Ok(ThreadStatus::WAITING),
-                "BLOCKED" => Ok(ThreadStatus::BLOCKED),
-                "TIMED_WAITING" => Ok(ThreadStatus::TIMED_WAITING),
-                "RUNNABLE" => Ok(ThreadStatus::RUNNABLE),
-                "TERMINATED" => Ok(ThreadStatus::TERMINATED),
+        if let Some((state, info)) = str.split_once(':') {
+            match info.trim() {
+                "NEW" => Ok(ThreadStatus::New),
+                "WAITING" => Ok(ThreadStatus::Waiting),
+                "BLOCKED" => Ok(ThreadStatus::Blocked),
+                "TIMED_WAITING" => Ok(ThreadStatus::TimedWaiting),
+                "RUNNABLE" => Ok(ThreadStatus::Runnable),
+                "TERMINATED" => Ok(ThreadStatus::Terminated),
                 _ => Err(()),
             }
         } else {
             match str.trim() {
-                "NEW" => Ok(ThreadStatus::NEW),
-                "WAITING" => Ok(ThreadStatus::WAITING),
-                "BLOCKED" => Ok(ThreadStatus::BLOCKED),
-                "TIMED_WAITING" => Ok(ThreadStatus::TIMED_WAITING),
-                "RUNNABLE" => Ok(ThreadStatus::RUNNABLE),
-                "TERMINATED" => Ok(ThreadStatus::TERMINATED),
+                "NEW" => Ok(ThreadStatus::New),
+                "WAITING" => Ok(ThreadStatus::Waiting),
+                "BLOCKED" => Ok(ThreadStatus::Blocked),
+                "TIMED_WAITING" => Ok(ThreadStatus::TimedWaiting),
+                "RUNNABLE" => Ok(ThreadStatus::Runnable),
+                "TERMINATED" => Ok(ThreadStatus::Terminated),
                 _ => Err(()),
             }
         }
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub struct StackTrace {
+#[derive(Serialize, Debug, PartialEq)]
+pub struct CallFrame {
     class_name: String,
-    line: u8,
-    method: String,
-    next: Option<Box<StackTrace>>,
+    method_name: String,
+    line_number: Option<u32>,
+    frame: Frame,
 }
 
-impl StackTrace {
-  
-    pub fn new(mut lines: Vec<&str>) -> Self {
-        lines.reverse();
-        let (class_name, method, line) = Self::parse_stack_trace(lines[0]);
-        lines.remove(0);
-        let next:StackTrace;
-        let next = if !lines.is_empty() {
-           Some(Box::new(StackTrace::new(lines)))
-        }else {
-          None
+impl CallFrame {
+    pub fn new(frame_info: &str) -> Self {
+        let parts: Vec<&str> = frame_info.split_whitespace().collect();
+        let method_info: &str = parts[1];
+
+        let method_parts: Vec<&str> = method_info.split('(').collect();
+        let method_name = method_parts[0].to_string();
+
+        let file_info = method_parts.get(1).map(|s| s.trim_end_matches(')'));
+        let (class_name, line_number) = if let Some(file_info) = file_info {
+            let file_parts: Vec<&str> = file_info.split(':').collect();
+            let class_name = file_parts.get(0).map(|s| s.split(".").collect());
+            let line_number = file_parts.get(1).map(|s| s.parse().unwrap_or(0));
+            (class_name, line_number)
+        } else {
+            (None, None)
         };
-        StackTrace {
+
+        CallFrame {
             class_name,
-            line,
-            method,
-            next,
+            line_number,
+            method_name,
+            frame: Frame::from_str(frame_info).unwrap(),
+        }
+    }
+}
+#[derive(Serialize, Debug, PartialEq)]
+pub enum Frame {
+    MethodCall,
+    Lock {
+        lock_address: String,
+    },
+    Monitor {
+        monitor_address: String,
+        action: MonitorAction,
+    },
+    NativeMethod,
+}
+
+impl FromStr for Frame {
+    type Err = ();
+
+    fn from_str(frame_info: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = frame_info.split_whitespace().collect();
+        match parts[0] {
+            "-" => match parts[1] {
+                "locked" => Ok(Frame::Lock {
+                    lock_address: extract_address(frame_info),
+                }),
+                "waiting" => Ok(Frame::Monitor {
+                    monitor_address: extract_address(frame_info),
+                    action: if frame_info.contains("waiting to lock") {
+                        MonitorAction::WaitingToLock
+                    } else if frame_info.contains("waiting on") {
+                        MonitorAction::WaitingOn
+                    } else {
+                        MonitorAction::Locked
+                    },
+                }),
+                _ => Err(()),
+            },
+            "at" => match parts[2] {
+                "Native Method" => Ok(Frame::NativeMethod),
+                _ => Ok(Frame::MethodCall),
+            },
+            _ => Err(()),
+        }
+    }
+}
+
+fn extract_address(input: &str) -> String {
+    let mut results = Vec::new();
+    let parts: Vec<&str> = input.split('<').collect();
+
+    for part in parts.iter().skip(1) {
+        let content: Vec<&str> = part.split('>').collect();
+        if let Some(content) = content.get(0) {
+            results.push(content.trim().to_string());
         }
     }
 
-    fn parse_stack_trace(s: &str) -> (String, String, u8) {
-        // Trim the leading "at " and remove the trailing ")"
-        let s = s.trim_start_matches("at ").trim_end_matches(')');
+    results.concat()
+}
+#[derive(Serialize, Debug, PartialEq)]
+pub enum MonitorAction {
+    WaitingToLock,
+    WaitingOn,
+    Locked,
+}
 
-        // Find the position of the opening parenthesis
-        if let Some((method_and_class, rest)) = s.split_once('(') {
-            // Split the method_and_class part by the last '.' to separate method from class
-            let (class, method) = if let Some((class, method)) = method_and_class.rsplit_once('.') {
-                (class.to_string(), method.to_string())
-            } else {
-                (method_and_class.to_string(), String::new())
-            };
+#[cfg(test)]
+pub mod tests {
 
-            // Extract line number
-            let line_number = if let Some((_, line)) = rest.split_once(':') {
-                line.parse::<u8>().unwrap_or(0)
-            } else {
-                0
-            };
+    use std::vec;
 
-            (format!("{}.{}", class, method), class, line_number)
-        } else {
-            // Handle the case where the format might be unexpected
-            ("".to_string(), "".to_string(), 0)
-        }
+    use super::*;
+
+    #[test]
+    pub fn test_runnable_thread() {
+        let lines = vec![
+          "\"Thread-1\" #1 prio=5 os_prio=0 tid=0x00007f3d70001800 nid=0x2f03 runnable [0x00007f3d80f21000]",
+          "java.lang.Thread.State: RUNNABLE",
+          "at com.example.MyClass.myMethod(MyClass.java:10)",
+          "at com.example.MyClass.run(MyClass.java:5)",
+          "at java.lang.Thread.run(Thread.java:748)"
+    ];
+        let result = Thread::new(lines);
+        let mut frames:Vec<CallFrame> = Vec::new();
+        frames.push(CallFrame {
+          class_name: "Thread".to_string(),
+          method_name: "java.lang.Thread.run".to_string(),
+          line_number: Some(748),
+          frame: Frame::MethodCall,
+        });
+        let thread = Thread {
+            id: "1".to_string(),
+            name: "Thread-1".to_string(),
+            prio: 5,
+            os_prio: 0,
+            tid: 0x00007f3d70001800,
+            nid: 0x2f03,
+            status: ThreadStatus::Runnable,
+            frames,
+        };
+        println!("{:?}", result);
+        assert_eq!(result, thread)
+    }
+
+    #[test]
+    pub fn test_blocked_thread() {
+        let lines = vec![
+          "\"Thread-2\" #2 prio=5 os_prio=0 tid=0x00007f3d70002800 nid=0x2f04 waiting for monitor entry [0x00007f3d80f22000]",
+        "java.lang.Thread.State: BLOCKED (on object monitor)",
+          "at com.example.MyClass.synchronizedMethod(MyClass.java:20)",
+          "- waiting to lock <0x00000000c7c600d0> (a java.lang.Object)",
+          "at com.example.MyClass.run(MyClass.java:15)",
+          "at java.lang.Thread.run(Thread.java:748)"     
+        ];
+        let result = Thread::new(lines);
+        print!("result:{:?}", result)
+    }
+
+    #[test]
+    pub fn test_waiting_thread() {
+        let lines = vec![
+          "\"Thread-3\" #3 prio=5 os_prio=0 tid=0x00007f3d70003800 nid=0x2f05 in Object.wait() [0x00007f3d80f23000]",
+          "java.lang.Thread.State: WAITING (on object monitor)",
+          "at java.lang.Object.wait(Native Method)",
+          "- waiting on <0x00000000c7c600d0> (a java.lang.Object)",
+          "at java.lang.Object.wait(Object.java:502)",
+          "at com.example.MyClass.waitMethod(MyClass.java:30)",
+          "- locked <0x00000000c7c600d0> (a java.lang.Object)",
+          "at com.example.MyClass.run(MyClass.java:25)",
+          "at java.lang.Thread.run(Thread.java:748)",
+        ];
+        let result = Thread::new(lines);
+        print!("result:{:?}", result)
+    }
+    #[test]
+    pub fn test_time_waiting_sleep_thread() {
+        let lines = vec![
+          "\"Thread-4\" #4 prio=5 os_prio=0 tid=0x00007f3d70004800 nid=0x2f06 waiting on condition [0x00007f3d80f24000]",
+          "java.lang.Thread.State: TIMED_WAITING (sleeping)",
+          "at java.lang.Thread.sleep(Native Method)",
+          "at com.example.MyClass.sleepMethod(MyClass.java:40)",
+          "at com.example.MyClass.run(MyClass.java:35)",
+          "at java.lang.Thread.run(Thread.java:748)",
+        ];
+        let result = Thread::new(lines);
+        print!("result:{:?}", result)
+    }
+    #[test]
+    pub fn test_time_wating_monitor_thread() {
+        let lines = vec![
+          "\"Thread-7\" #7 prio=5 os_prio=0 tid=0x00007f3d70007800 nid=0x2f09 timed waiting on object monitor [0x00007f3d80f26000]",
+          "java.lang.Thread.State: TIMED_WAITING (on object monitor)",
+          "at java.lang.Object.wait(Native Method)",
+          "- waiting on <0x00000000c7c600d0> (a java.lang.Object)",
+          "at java.lang.Object.wait(Object.java:502)",
+          "at com.example.MyClass.timedWaitMethod(MyClass.java:60)",
+          "- locked <0x00000000c7c600d0> (a java.lang.Object)",
+          "at com.example.MyClass.run(MyClass.java:55)",
+          "at java.lang.Thread.run(Thread.java:748)"
+        ];
+        let result = Thread::new(lines);
+        print!("result:{:?}", result)
+    }
+
+    #[test]
+    pub fn test_time_wating_condition_thread() {
+        let lines = vec![
+          "\"Thread-8\" #8 prio=5 os_prio=0 tid=0x00007f3d70008800 nid=0x2f0a waiting on condition [0x00007f3d80f27000]",
+          "java.lang.Thread.State: TIMED_WAITING (on a condition)",
+          "at sun.misc.Unsafe.park(Native Method)",
+          "- parking to wait for  <0x00000002a5bdfc00> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)",
+          "at java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)",
+          "at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(AbstractQueuedSynchronizer.java:2078)",
+          "at com.example.MyClass.timedConditionMethod(MyClass.java:70)",
+          "at com.example.MyClass.run(MyClass.java:65)",
+          "at java.lang.Thread.run(Thread.java:748)",
+        ];
+        let result = Thread::new(lines);
+        print!("result:{:?}", result)
+    }
+
+    #[test]
+    pub fn test_waiting_parking_thread() {
+        let lines = vec![
+          "\"Thread-6\" #6 prio=5 os_prio=0 tid=0x00007f3d70006800 nid=0x2f08 waiting on condition [0x00007f3d80f25000]",
+          "java.lang.Thread.State: WAITING (parking)",
+          "at sun.misc.Unsafe.park(Native Method)",
+          "- parking to wait for  <0x00000002a5bdfc00> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)",
+          "at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)",
+          "at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)",
+          "at com.example.MyClass.conditionMethod(MyClass.java:50)",
+          "at com.example.MyClass.run(MyClass.java:45)",
+          "at java.lang.Thread.run(Thread.java:748)"
+        ];
+        let result = Thread::new(lines);
+        print!("result:{:?}", result)
     }
 }
