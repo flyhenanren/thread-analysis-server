@@ -17,20 +17,25 @@ pub struct Thread {
 
 impl Thread {
     pub fn new(lines: Vec<&str>) -> Self {
-        let infos: Vec<&str> = lines[0].split_whitespace().collect();
+        let thread_info: Vec<&str> = lines[0].split_whitespace().collect();
         let status = ThreadStatus::from_str(lines[1]).unwrap();
         let call_info = &lines[2..=lines.len() - 1];
         let mut frames: Vec<CallFrame> = Vec::with_capacity(call_info.len());
         for call in call_info {
-            frames.push(CallFrame::new(&call));
+            frames.insert(0, CallFrame::new(&call));
         }
+        let tid_str =thread_info[4].split("=").nth(1).unwrap().trim_start_matches("0x");
+        let tid = u64::from_str_radix(tid_str, 16).unwrap();
+
+        let nid_str = thread_info[5].split("=").nth(1).unwrap().trim_start_matches("0x");
+        let nid = u64::from_str_radix(nid_str, 16).unwrap();
         Thread {
-            id: infos[1].to_string(),
-            name: infos[0].to_string(),
-            prio: infos[2].split("=").nth(1).unwrap().parse::<u16>().unwrap(),
-            os_prio: infos[3].split("=").nth(1).unwrap().parse::<u32>().unwrap(),
-            tid: infos[4].split("=").nth(1).unwrap().parse::<u64>().unwrap(),
-            nid: infos[5].split("=").nth(1).unwrap().parse::<u64>().unwrap(),
+            id: thread_info[1].to_string(),
+            name: thread_info[0].trim_matches('\"').to_string(),
+            prio: thread_info[2].split("=").nth(1).unwrap().parse::<u16>().unwrap(),
+            os_prio: thread_info[3].split("=").nth(1).unwrap().parse::<u32>().unwrap(),
+            tid,
+            nid,
             status,
             frames,
         }
@@ -93,15 +98,15 @@ impl CallFrame {
         let file_info = method_parts.get(1).map(|s| s.trim_end_matches(')'));
         let (class_name, line_number) = if let Some(file_info) = file_info {
             let file_parts: Vec<&str> = file_info.split(':').collect();
-            let class_name = file_parts.get(0).map(|s| s.split(".").collect());
-            let line_number = file_parts.get(1).map(|s| s.parse().unwrap_or(0));
+            let class_name = file_parts.get(0).map(|s| s.split(".").next().unwrap().to_string());
+            let line_number: Option<u32> = file_parts.get(1).map(|s| s.parse().unwrap_or(0));
             (class_name, line_number)
         } else {
             (None, None)
         };
 
         CallFrame {
-            class_name,
+            class_name: class_name.unwrap(),
             line_number,
             method_name,
             frame: Frame::from_str(frame_info).unwrap(),
@@ -143,7 +148,7 @@ impl FromStr for Frame {
                 }),
                 _ => Err(()),
             },
-            "at" => match parts[2] {
+            "at" => match parts[1] {
                 "Native Method" => Ok(Frame::NativeMethod),
                 _ => Ok(Frame::MethodCall),
             },
@@ -196,8 +201,20 @@ pub mod tests {
           line_number: Some(748),
           frame: Frame::MethodCall,
         });
+        frames.push(CallFrame {
+            class_name: "MyClass".to_string(),
+            method_name: "com.example.MyClass.run".to_string(),
+            line_number: Some(5),
+            frame: Frame::MethodCall,
+          });
+          frames.push(CallFrame {
+            class_name: "MyClass".to_string(),
+            method_name: "com.example.MyClass.myMethod".to_string(),
+            line_number: Some(10),
+            frame: Frame::MethodCall,
+          });
         let thread = Thread {
-            id: "1".to_string(),
+            id: "#1".to_string(),
             name: "Thread-1".to_string(),
             prio: 5,
             os_prio: 0,
@@ -206,7 +223,6 @@ pub mod tests {
             status: ThreadStatus::Runnable,
             frames,
         };
-        println!("{:?}", result);
         assert_eq!(result, thread)
     }
 
