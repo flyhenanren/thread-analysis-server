@@ -19,5 +19,7 @@ zip = "2.1.6"
 walkdir = "2.5.0"
 
 regex = "1"
+
+lazy_static = "1.4"
 [[bin]]
 name="web-server"
