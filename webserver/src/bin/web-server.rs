@@ -12,7 +12,10 @@ mod state;
 mod files;
 #[path ="../models/mod.rs"]
 mod models;
-
+#[path ="../call_tree/mod.rs"]
+mod call_tree;
+#[path ="../error.rs"]
+mod error;
 use routers::*;
 use state::AppState;
 

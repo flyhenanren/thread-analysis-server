@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use chrono::NaiveTime;
 
 #[derive(Debug, PartialEq)]
@@ -16,14 +18,14 @@ pub struct Cpu {
 }
 
 impl Cpu {
-    pub fn new(lines: Vec<&str>) -> Self {
+    pub fn new(lines: Vec<String>) -> Self {
         let time = Self::extract_main(lines.get(0).unwrap());
         let (tasks, running, sleeping) = Self::extract_threads(lines.get(1).unwrap());
         let (us, sy, id) = Self::extract_cpu(lines.get(2).unwrap());
         let (mem_total, mem_free, mem_used) = Self::extract_mem(lines.get(3).unwrap());
         let mut process:Vec<Process> = Vec::with_capacity(lines.len() - 6);
         for i in 7..lines.len() {
-            process.push(Process::new(lines[i]));
+            process.push(Process::from_str(&lines[i]).unwrap());
         }
         Cpu {
             time,
@@ -127,17 +129,18 @@ pub struct Process {
     command: String,
 }
 
-impl Process {
-    pub fn new(line: &str) -> Self {
+impl FromStr for Process {
+   type Err = ();
+    fn from_str(line: &str) -> Result<Self, Self::Err> {
         let value:Vec<&str> = line.split_whitespace().collect();
-        Process {
+        Ok(Process {
             pid: value[0].parse::<u32>().unwrap(),
             usr: value[1].to_string(),
             cpu: value[8].parse::<f64>().unwrap(),
             mem: value[9].parse::<f64>().unwrap(),
             time:value[10].to_string(),
             command: value[11].to_string(),
-        }
+        })
     }
 }
 
@@ -152,17 +155,13 @@ pub mod test{
     pub fn test_cpu(){
         let file = fs::File::open("D:\\dump\\20240809\\日志\\异步节点\\20240809.tar\\20240809\\20240809_22\\20240809_223714\\cpu_top_17606.log").unwrap();
         let reader = io::BufReader::new(file);
-        let mut lines_str:Vec<&str> = Vec::new();
         let mut lines_storage:Vec<String> = Vec::new();
 
         for line in reader.lines() {
             lines_storage.push(line.unwrap());
         }
-
-        for s in &lines_storage {
-            lines_str.push(s);
-        }
-        let result = Cpu::new(lines_str);
+        
+        let result = Cpu::new(lines_storage);
         println!("{:?}", result);
     }
 }

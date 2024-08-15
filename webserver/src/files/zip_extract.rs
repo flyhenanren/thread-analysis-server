@@ -46,3 +46,7 @@ pub fn unzip_and_extract_file(source: &Path) -> io::Result<Vec<FileInfo>> {
     }
     Ok(file_mapping)
 }
+
+pub fn extract_file(source: &Path)  -> io::Result<Vec<FileInfo>> {
+    Ok(vec![])
+}

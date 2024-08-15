@@ -1,64 +1,84 @@
+use std::process::id;
 use std::str::FromStr;
 
 use regex::Regex;
 use serde::Serialize;
 
+use crate::error::ThreadError;
+use crate::state;
+
 #[derive(Serialize, Debug, PartialEq)]
 pub struct Thread {
-    id: String,
-    name: String,
-    prio: u16,
-    os_prio: u32,
-    tid: u64,
-    nid: u64,
-    status: ThreadStatus,
-    frames: Vec<CallFrame>,
+    pub id: String,
+    pub name: String,
+    pub prio: u16,
+    pub os_prio: u32,
+    pub tid: u64,
+    pub nid: u64,
+    pub status: ThreadStatus,
+    pub frames: Vec<CallFrame>,
 }
 
 impl Thread {
-    pub fn new(lines: Vec<&str>) -> Self {
+    pub fn new(lines: Vec<String>) -> Result<Self, ThreadError> {
         let thread_info: Vec<&str> = lines[0].split_whitespace().collect();
-        let status = ThreadStatus::from_str(lines[1]).unwrap();
+        let status: ThreadStatus = match ThreadStatus::from_str(&lines[1]) {
+            Ok(status) => status,
+            Err(e) => {
+                return Err(ThreadError::ParseError(format!(
+                    "解析数据行:{}\r\n时错误。\r\nerror:{}",
+                    lines[1],
+                    e.to_string()
+                )))
+            }
+        };
+
         let call_info = &lines[2..=lines.len() - 1];
         let mut frames: Vec<CallFrame> = Vec::with_capacity(call_info.len());
         for call in call_info {
-            frames.insert(0, CallFrame::new(&call));
+            frames.insert(0, CallFrame::new(&call)?);
         }
         let tid_str = thread_info[4]
             .split("=")
             .nth(1)
-            .unwrap()
+            .expect(format!("tid 解析错误：{}",thread_info[4]).as_str())
             .trim_start_matches("0x");
-        let tid = u64::from_str_radix(tid_str, 16).unwrap();
+        let tid = match u64::from_str_radix(tid_str, 16){
+            Ok(tid) => tid,
+            Err(e) => return Err(ThreadError::ParseError(format!("解析tid:{}时错误:{}", tid_str,e.to_string())))
+        };
 
         let nid_str = thread_info[5]
             .split("=")
             .nth(1)
-            .unwrap()
+            .expect(format!("nid 解析错误：{}",thread_info[4]).as_str())
             .trim_start_matches("0x");
         let nid = u64::from_str_radix(nid_str, 16).unwrap();
-        Thread {
+        Ok(Thread {
             id: thread_info[1].to_string(),
             name: thread_info[0].trim_matches('\"').to_string(),
             prio: thread_info[2]
                 .split("=")
                 .nth(1)
-                .unwrap()
+                .expect(format!("prio 解析错误：{}",thread_info[2]).as_str())
                 .parse::<u16>()
-                .unwrap(),
+                .expect(format!("prio 解析错误：{}",thread_info[2]).as_str()),
             os_prio: thread_info[3]
                 .split("=")
                 .nth(1)
-                .unwrap()
+                .expect(format!("os_prio 解析错误：{}",thread_info[3]).as_str())
                 .parse::<u32>()
-                .unwrap(),
+                .expect(format!("os_prio 解析错误：{}",thread_info[3]).as_str()),
             tid,
             nid,
             status,
             frames,
-        }
+        })
     }
 }
+
+
+
 
 #[derive(Serialize, Debug, PartialEq)]
 pub enum ThreadStatus {
@@ -71,7 +91,7 @@ pub enum ThreadStatus {
 }
 
 impl FromStr for ThreadStatus {
-    type Err = ();
+    type Err = ThreadError;
     fn from_str(status: &str) -> Result<Self, Self::Err> {
         lazy_static::lazy_static! {
             static ref REGEX:Regex = Regex::new(r"State:\s(\w+)").unwrap();
@@ -85,63 +105,66 @@ impl FromStr for ThreadStatus {
                 "TIMED_WAITING" => Ok(ThreadStatus::TimedWaiting),
                 "RUNNABLE" => Ok(ThreadStatus::Runnable),
                 "TERMINATED" => Ok(ThreadStatus::Terminated),
-                _ => Err(()),
+                _ => Err(ThreadError::IllegalStatus(captures[1].to_string())),
             }
         } else {
-            Err(())
+            Err(ThreadError::IllegalStatus(status.to_owned()))
         }
     }
 }
 
 #[derive(Serialize, Debug, PartialEq)]
 pub struct CallFrame {
-    class_name: String,
-    method_name: Option<String>,
-    line_number: Option<u32>,
-    frame: Frame,
+    pub class_name: String,
+    pub method_name: Option<String>,
+    pub line_number: Option<u32>,
+    pub frame: Frame,
 }
 
 impl CallFrame {
-    pub fn new(frame_info: &str) -> Self {
-        let parts: Option<(&str, &str)>= frame_info.split_once(" ");
+    pub fn new(frame_info: &str) -> Result<Self, ThreadError> {
+        let parts: Option<(&str, &str)> = frame_info.split_once(" ");
         let (method_name, class_name, line_number) = match parts {
-            Some((key, method_info)) => {
-                match key {
-                    "-" => {
-                        let (_, after_prefix) = method_info.split_once("(a ").unwrap_or(("",""));
-                        let class_name = after_prefix.split(")").next().unwrap_or("Unknown Source").trim().to_string();
-                        (None, class_name, None)
-                     },
-                     "at" => {
-                         let method_parts: Vec<&str> = method_info.split('(').collect();
-                         let method_name = Some(method_parts[0].to_string());
-         
-                         let file_info = method_parts.get(1).map(|s| s.trim_end_matches(')'));
-                         let (class_name, line_number) = if let Some(file_info) = file_info {
-                             let file_parts: Vec<&str> = file_info.split(':').collect();
-                             let class_name = file_parts
-                                 .get(0)
-                                 .map(|s| s.split(".").next().unwrap().to_string())
-                                 .unwrap();
-                             let line_number: Option<u32> =
-                                 file_parts.get(1).map(|s| s.parse().unwrap());
-                             (class_name, line_number)
-                         } else {
-                             ("Unknown Source".to_string(), None)
-                         };
-                         (method_name, class_name, line_number)
-                     },
-                     _ => (None, "Unknown Source".to_string(), None)
+            Some((key, method_info)) => match key {
+                "-" => {
+                    let (_, after_prefix) = method_info.split_once("(a ").unwrap_or(("", ""));
+                    let class_name = after_prefix
+                        .split(")")
+                        .next()
+                        .expect(format!("无法识别的class name:{}", after_prefix).as_str())
+                        .trim()
+                        .to_string();
+                    (None, class_name, None)
                 }
+                "at" => {
+                    let method_parts: Vec<&str> = method_info.split('(').collect();
+                    let method_name = Some(method_parts[0].to_string());
+
+                    let file_info = method_parts.get(1).map(|s| s.trim_end_matches(')'));
+                    let (class_name, line_number) = if let Some(file_info) = file_info {
+                        let file_parts: Vec<&str> = file_info.split(':').collect();
+                        let class_name = file_parts
+                            .get(0)
+                            .map(|s| s.split(".").next().unwrap().to_string())
+                            .expect(format!("无法识别的class name:{}", file_info).as_str());
+                        let line_number: Option<u32> =
+                            file_parts.get(1).map(|s| s.parse().unwrap());
+                        (class_name, line_number)
+                    } else {
+                        ("Unknown Source".to_string(), None)
+                    };
+                    (method_name, class_name, line_number)
+                }
+                _ => return Err(ThreadError::ParseError("".to_string())),
             },
-            None => (None, "Unknown Source".to_string(), None)
+            None => return Err(ThreadError::ParseError("分割失败".to_string())),
         };
-        CallFrame {
+        Ok(CallFrame {
             class_name,
             line_number,
             method_name,
             frame: Frame::from_str(frame_info).unwrap(),
-        }
+        })
     }
 }
 #[derive(Serialize, Debug, PartialEq)]
@@ -154,7 +177,7 @@ pub enum Frame {
         monitor_address: u64,
         action: MonitorAction,
     },
-    Parking{
+    Parking {
         parking_address: u64,
     },
     NativeMethod,
@@ -178,18 +201,20 @@ impl FromStr for Frame {
                         MonitorAction::WaitingOn
                     } else {
                         MonitorAction::Locked
-                    }
+                    },
                 }),
-                "parking" => Ok(Frame::Parking { parking_address: extract_address(frame_info)}),
+                "parking" => Ok(Frame::Parking {
+                    parking_address: extract_address(frame_info),
+                }),
                 _ => Err(()),
             },
             "at" => {
                 if frame_info.contains("(Native Method)") {
                     Ok(Frame::NativeMethod)
-                }else {
+                } else {
                     Ok(Frame::MethodCall)
                 }
-            },
+            }
             _ => Err(()),
         }
     }
@@ -223,11 +248,11 @@ pub mod tests {
     #[test]
     pub fn test_runnable_thread() {
         let lines = vec![
-          "\"Thread-1\" #1 prio=5 os_prio=0 tid=0x00007f3d70001800 nid=0x2f03 runnable [0x00007f3d80f21000]",
-          "java.lang.Thread.State: RUNNABLE",
-          "at com.example.MyClass.myMethod(MyClass.java:10)",
-          "at com.example.MyClass.run(MyClass.java:5)",
-          "at java.lang.Thread.run(Thread.java:748)"
+          "\"Thread-1\" #1 prio=5 os_prio=0 tid=0x00007f3d70001800 nid=0x2f03 runnable [0x00007f3d80f21000]".to_string(),
+          "java.lang.Thread.State: RUNNABLE".to_string(),
+          "at com.example.MyClass.myMethod(MyClass.java:10)".to_string(),
+          "at com.example.MyClass.run(MyClass.java:5)".to_string(),
+          "at java.lang.Thread.run(Thread.java:748)".to_string()
     ];
         let result = Thread::new(lines);
         let mut frames: Vec<CallFrame> = Vec::new();
@@ -259,18 +284,18 @@ pub mod tests {
             status: ThreadStatus::Runnable,
             frames,
         };
-        assert_eq!(result, thread)
+        assert_eq!(result.unwrap(), thread)
     }
 
     #[test]
     pub fn test_blocked_thread() {
         let lines = vec![
-          "\"Thread-2\" #2 prio=5 os_prio=0 tid=0x00007f3d70002800 nid=0x2f04 waiting for monitor entry [0x00007f3d80f22000]",
-          "java.lang.Thread.State: BLOCKED (on object monitor)",
-          "at com.example.MyClass.synchronizedMethod(MyClass.java:20)",
-          "- waiting to lock <0x00000000c7c600d0> (a java.lang.Object)",
-          "at com.example.MyClass.run(MyClass.java:15)",
-          "at java.lang.Thread.run(Thread.java:748)"     
+          "\"Thread-2\" #2 prio=5 os_prio=0 tid=0x00007f3d70002800 nid=0x2f04 waiting for monitor entry [0x00007f3d80f22000]".to_string(),
+          "java.lang.Thread.State: BLOCKED (on object monitor)".to_string(),
+          "at com.example.MyClass.synchronizedMethod(MyClass.java:20)".to_string(),
+          "- waiting to lock <0x00000000c7c600d0> (a java.lang.Object)".to_string(),
+          "at com.example.MyClass.run(MyClass.java:15)".to_string(),
+          "at java.lang.Thread.run(Thread.java:748)".to_string()     
         ];
         let result = Thread::new(lines);
         let mut frames: Vec<CallFrame> = Vec::new();
@@ -290,7 +315,10 @@ pub mod tests {
             class_name: "java.lang.Object".to_string(),
             method_name: None,
             line_number: None,
-            frame: Frame::Monitor { monitor_address: 0x00000000c7c600d0, action:  MonitorAction::WaitingToLock},
+            frame: Frame::Monitor {
+                monitor_address: 0x00000000c7c600d0,
+                action: MonitorAction::WaitingToLock,
+            },
         });
         frames.push(CallFrame {
             class_name: "MyClass".to_string(),
@@ -308,21 +336,21 @@ pub mod tests {
             status: ThreadStatus::Blocked,
             frames,
         };
-        assert_eq!(result, thread)
+        assert_eq!(result.unwrap(), thread)
     }
 
     #[test]
     pub fn test_waiting_thread() {
         let lines = vec![
-          "\"Thread-3\" #3 prio=5 os_prio=0 tid=0x00007f3d70003800 nid=0x2f05 in Object.wait() [0x00007f3d80f23000]",
-          "java.lang.Thread.State: WAITING (on object monitor)",
-          "at java.lang.Object.wait(Native Method)",
-          "- waiting on <0x00000000c7c600d0> (a java.lang.Object)",
-          "at java.lang.Object.wait(Object.java:502)",
-          "at com.example.MyClass.waitMethod(MyClass.java:30)",
-          "- locked <0x00000000c7c600d0> (a java.lang.Object)",
-          "at com.example.MyClass.run(MyClass.java:25)",
-          "at java.lang.Thread.run(Thread.java:748)",
+          "\"Thread-3\" #3 prio=5 os_prio=0 tid=0x00007f3d70003800 nid=0x2f05 in Object.wait() [0x00007f3d80f23000]".to_string(),
+          "java.lang.Thread.State: WAITING (on object monitor)".to_string(),
+          "at java.lang.Object.wait(Native Method)".to_string(),
+          "- waiting on <0x00000000c7c600d0> (a java.lang.Object)".to_string(),
+          "at java.lang.Object.wait(Object.java:502)".to_string(),
+          "at com.example.MyClass.waitMethod(MyClass.java:30)".to_string(),
+          "- locked <0x00000000c7c600d0> (a java.lang.Object)".to_string(),
+          "at com.example.MyClass.run(MyClass.java:25)".to_string(),
+          "at java.lang.Thread.run(Thread.java:748)".to_string(),
         ];
         let result = Thread::new(lines);
         let mut frames: Vec<CallFrame> = Vec::new();
@@ -342,7 +370,9 @@ pub mod tests {
             class_name: "java.lang.Object".to_string(),
             method_name: None,
             line_number: None,
-            frame: Frame::Lock { lock_address: 0x00000000c7c600d0 },
+            frame: Frame::Lock {
+                lock_address: 0x00000000c7c600d0,
+            },
         });
         frames.push(CallFrame {
             class_name: "MyClass".to_string(),
@@ -360,7 +390,10 @@ pub mod tests {
             class_name: "java.lang.Object".to_string(),
             method_name: None,
             line_number: None,
-            frame: Frame::Monitor { monitor_address: 0x00000000c7c600d0, action: MonitorAction::WaitingOn },
+            frame: Frame::Monitor {
+                monitor_address: 0x00000000c7c600d0,
+                action: MonitorAction::WaitingOn,
+            },
         });
         frames.push(CallFrame {
             class_name: "Native Method".to_string(),
@@ -378,17 +411,17 @@ pub mod tests {
             status: ThreadStatus::Waiting,
             frames,
         };
-        assert_eq!(result, thread)
+        assert_eq!(result.unwrap(), thread)
     }
     #[test]
     pub fn test_time_waiting_sleep_thread() {
         let lines = vec![
-          "\"Thread-4\" #4 prio=5 os_prio=0 tid=0x00007f3d70004800 nid=0x2f06 waiting on condition [0x00007f3d80f24000]",
-          "java.lang.Thread.State: TIMED_WAITING (sleeping)",
-          "at java.lang.Thread.sleep(Native Method)",
-          "at com.example.MyClass.sleepMethod(MyClass.java:40)",
-          "at com.example.MyClass.run(MyClass.java:35)",
-          "at java.lang.Thread.run(Thread.java:748)",
+          "\"Thread-4\" #4 prio=5 os_prio=0 tid=0x00007f3d70004800 nid=0x2f06 waiting on condition [0x00007f3d80f24000]".to_string(),
+          "java.lang.Thread.State: TIMED_WAITING (sleeping)".to_string(),
+          "at java.lang.Thread.sleep(Native Method)".to_string(),
+          "at com.example.MyClass.sleepMethod(MyClass.java:40)".to_string(),
+          "at com.example.MyClass.run(MyClass.java:35)".to_string(),
+          "at java.lang.Thread.run(Thread.java:748)".to_string(),
         ];
         let result = Thread::new(lines);
         let mut frames: Vec<CallFrame> = Vec::new();
@@ -416,7 +449,7 @@ pub mod tests {
             line_number: None,
             frame: Frame::NativeMethod,
         });
-       
+
         let thread = Thread {
             id: "#4".to_string(),
             name: "Thread-4".to_string(),
@@ -427,20 +460,20 @@ pub mod tests {
             status: ThreadStatus::TimedWaiting,
             frames,
         };
-        assert_eq!(result, thread)
+        assert_eq!(result.unwrap(), thread)
     }
     #[test]
     pub fn test_time_wating_monitor_thread() {
         let lines = vec![
-          "\"Thread-7\" #7 prio=5 os_prio=0 tid=0x00007f3d70007800 nid=0x2f09 timed waiting on object monitor [0x00007f3d80f26000]",
-          "java.lang.Thread.State: TIMED_WAITING (on object monitor)",
-          "at java.lang.Object.wait(Native Method)",
-          "- waiting on <0x00000000c7c600d0> (a java.lang.Object)",
-          "at java.lang.Object.wait(Object.java:502)",
-          "at com.example.MyClass.timedWaitMethod(MyClass.java:60)",
-          "- locked <0x00000000c7c600d0> (a java.lang.Object)",
-          "at com.example.MyClass.run(MyClass.java:55)",
-          "at java.lang.Thread.run(Thread.java:748)"
+          "\"Thread-7\" #7 prio=5 os_prio=0 tid=0x00007f3d70007800 nid=0x2f09 timed waiting on object monitor [0x00007f3d80f26000]".to_string(),
+          "java.lang.Thread.State: TIMED_WAITING (on object monitor)".to_string(),
+          "at java.lang.Object.wait(Native Method)".to_string(),
+          "- waiting on <0x00000000c7c600d0> (a java.lang.Object)".to_string(),
+          "at java.lang.Object.wait(Object.java:502)".to_string(),
+          "at com.example.MyClass.timedWaitMethod(MyClass.java:60)".to_string(),
+          "- locked <0x00000000c7c600d0> (a java.lang.Object)".to_string(),
+          "at com.example.MyClass.run(MyClass.java:55)".to_string(),
+          "at java.lang.Thread.run(Thread.java:748)".to_string()
         ];
         let result = Thread::new(lines);
         let mut frames: Vec<CallFrame> = Vec::new();
@@ -460,7 +493,9 @@ pub mod tests {
             class_name: "java.lang.Object".to_string(),
             method_name: None,
             line_number: None,
-            frame: Frame::Lock { lock_address: 0x00000000c7c600d0 } ,
+            frame: Frame::Lock {
+                lock_address: 0x00000000c7c600d0,
+            },
         });
         frames.push(CallFrame {
             class_name: "MyClass".to_string(),
@@ -478,7 +513,10 @@ pub mod tests {
             class_name: "java.lang.Object".to_string(),
             method_name: None,
             line_number: None,
-            frame: Frame::Monitor { monitor_address: 0x00000000c7c600d0, action: MonitorAction::WaitingOn },
+            frame: Frame::Monitor {
+                monitor_address: 0x00000000c7c600d0,
+                action: MonitorAction::WaitingOn,
+            },
         });
         frames.push(CallFrame {
             class_name: "Native Method".to_string(),
@@ -496,21 +534,21 @@ pub mod tests {
             status: ThreadStatus::TimedWaiting,
             frames,
         };
-        assert_eq!(result, thread)
+        assert_eq!(result.unwrap(), thread)
     }
 
     #[test]
     pub fn test_time_wating_condition_thread() {
         let lines = vec![
-          "\"Thread-8\" #8 prio=5 os_prio=0 tid=0x00007f3d70008800 nid=0x2f0a waiting on condition [0x00007f3d80f27000]",
-          "java.lang.Thread.State: TIMED_WAITING (on a condition)",
-          "at sun.misc.Unsafe.park(Native Method)",
-          "- parking to wait for  <0x00000002a5bdfc00> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)",
-          "at java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)",
-          "at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(AbstractQueuedSynchronizer.java:2078)",
-          "at com.example.MyClass.timedConditionMethod(MyClass.java:70)",
-          "at com.example.MyClass.run(MyClass.java:65)",
-          "at java.lang.Thread.run(Thread.java:748)",
+          "\"Thread-8\" #8 prio=5 os_prio=0 tid=0x00007f3d70008800 nid=0x2f0a waiting on condition [0x00007f3d80f27000]".to_string(),
+          "java.lang.Thread.State: TIMED_WAITING (on a condition)".to_string(),
+          "at sun.misc.Unsafe.park(Native Method)".to_string(),
+          "- parking to wait for  <0x00000002a5bdfc00> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)".to_string(),
+          "at java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)".to_string(),
+          "at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(AbstractQueuedSynchronizer.java:2078)".to_string(),
+          "at com.example.MyClass.timedConditionMethod(MyClass.java:70)".to_string(),
+          "at com.example.MyClass.run(MyClass.java:65)".to_string(),
+          "at java.lang.Thread.run(Thread.java:748)".to_string(),
         ];
         let result = Thread::new(lines);
         let mut frames: Vec<CallFrame> = Vec::new();
@@ -534,7 +572,10 @@ pub mod tests {
         });
         frames.push(CallFrame {
             class_name: "AbstractQueuedSynchronizer".to_string(),
-            method_name: Some("java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos".to_string()),
+            method_name: Some(
+                "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos"
+                    .to_string(),
+            ),
             line_number: Some(2078),
             frame: Frame::MethodCall,
         });
@@ -545,10 +586,13 @@ pub mod tests {
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
-            class_name: "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject".to_string(),
+            class_name: "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject"
+                .to_string(),
             method_name: None,
             line_number: None,
-            frame: Frame::Parking { parking_address: 0x00000002a5bdfc00 },
+            frame: Frame::Parking {
+                parking_address: 0x00000002a5bdfc00,
+            },
         });
         frames.push(CallFrame {
             class_name: "Native Method".to_string(),
@@ -566,21 +610,21 @@ pub mod tests {
             status: ThreadStatus::TimedWaiting,
             frames,
         };
-        assert_eq!(result, thread)
+        assert_eq!(result.unwrap(), thread)
     }
 
     #[test]
     pub fn test_waiting_parking_thread() {
         let lines = vec![
-          "\"Thread-6\" #6 prio=5 os_prio=0 tid=0x00007f3d70006800 nid=0x2f08 waiting on condition [0x00007f3d80f25000]",
-          "java.lang.Thread.State: WAITING (parking)",
-          "at sun.misc.Unsafe.park(Native Method)",
-          "- parking to wait for  <0x00000002a5bdfc00> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)",
-          "at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)",
-          "at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)",
-          "at com.example.MyClass.conditionMethod(MyClass.java:50)",
-          "at com.example.MyClass.run(MyClass.java:45)",
-          "at java.lang.Thread.run(Thread.java:748)"
+          "\"Thread-6\" #6 prio=5 os_prio=0 tid=0x00007f3d70006800 nid=0x2f08 waiting on condition [0x00007f3d80f25000]".to_string(),
+          "java.lang.Thread.State: WAITING (parking)".to_string(),
+          "at sun.misc.Unsafe.park(Native Method)".to_string(),
+          "- parking to wait for  <0x00000002a5bdfc00> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)".to_string(),
+          "at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)".to_string(),
+          "at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)".to_string(),
+          "at com.example.MyClass.conditionMethod(MyClass.java:50)".to_string(),
+          "at com.example.MyClass.run(MyClass.java:45)".to_string(),
+          "at java.lang.Thread.run(Thread.java:748)".to_string()
         ];
         let result = Thread::new(lines);
         let mut frames: Vec<CallFrame> = Vec::new();
@@ -604,7 +648,10 @@ pub mod tests {
         });
         frames.push(CallFrame {
             class_name: "AbstractQueuedSynchronizer".to_string(),
-            method_name: Some("java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await".to_string()),
+            method_name: Some(
+                "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await"
+                    .to_string(),
+            ),
             line_number: Some(2039),
             frame: Frame::MethodCall,
         });
@@ -615,10 +662,13 @@ pub mod tests {
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
-            class_name: "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject".to_string(),
+            class_name: "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject"
+                .to_string(),
             method_name: None,
             line_number: None,
-            frame: Frame::Parking { parking_address: 0x00000002a5bdfc00 },
+            frame: Frame::Parking {
+                parking_address: 0x00000002a5bdfc00,
+            },
         });
         frames.push(CallFrame {
             class_name: "Native Method".to_string(),
@@ -636,6 +686,6 @@ pub mod tests {
             status: ThreadStatus::Waiting,
             frames,
         };
-        assert_eq!(result, thread)
+        assert_eq!(result.unwrap(), thread)
     }
 }

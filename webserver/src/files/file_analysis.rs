@@ -1,27 +1,35 @@
-use std::{
-    fs::{self, File},
-    io::{self, Read},
-};
+use std::fs::{self, File};
+use std::io::{self, BufWriter, Error, Read, Write};
 use std::path::Path;
+
 use crate::{files::zip_extract, models::file_info::FileInfo};
 
 pub fn analysis(path: &str) {
-    let file_type = get_file_type(path).map_err(|e| {
-        panic!("文件类型校验时发生错误：{}", e);
-    }).unwrap();
+    let file_type = get_file_type(path)
+        .map_err(|e| {
+            panic!("文件类型校验时发生错误：{}", e);
+        })
+        .unwrap();
     let source_path = Path::new(path);
-    if file_type == 1 {
-        let file_info = zip_extract::unzip_and_extract_file(&source_path).map_err(|e| {
-            panic!("解析文件时发生错误：{}", e);
-        }).unwrap();    
-        build_index(path, file_info);
-    }
+
+    let file_info: Vec<FileInfo> = match file_type {
+        1 => zip_extract::extract_file(&source_path)
+            .map_err(|e| {
+                panic!("读取文件时发生错误：{}", e);
+            })
+            .unwrap(),
+        _ => zip_extract::unzip_and_extract_file(&source_path)
+            .map_err(|e| {
+                panic!("解析文件时发生错误：{}", e);
+            })
+            .unwrap(),
+    };
 }
 
 /**
  * 获取选中的路径类型，是文件夹还是压缩包
  */
-fn get_file_type(path: &str) -> Result<u8, io::Error> {
+fn get_file_type(path: &str) -> Result<u8, Error> {
     let meta_data = fs::metadata(path).unwrap_or_else(|e| {
         println!("Error reading metadata: {:?}", e);
         panic!("无法解析路径:{} 对应的文件", path);
@@ -34,10 +42,10 @@ fn get_file_type(path: &str) -> Result<u8, io::Error> {
     let mut buffer = [0; 5];
     let bytes_read = file.read(&mut buffer)?;
     if bytes_read < buffer.len() {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "文件长度为0"));
+        return Err(Error::new(io::ErrorKind::InvalidData, "文件长度为0"));
     }
     if !check_file_type(&buffer) {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "非法的文件类型"));
+        return Err(Error::new(io::ErrorKind::InvalidData, "非法的文件类型"));
     }
     Ok(0)
 }
@@ -45,8 +53,22 @@ fn get_file_type(path: &str) -> Result<u8, io::Error> {
 /**
  * 创建索引文件
  */
-fn build_index(path: &str, file_info: Vec<FileInfo>) {
-    
+fn check_and_build_index(path: &Path, file_info: Vec<FileInfo>) {
+    let target: &Path = path.parent().expect("获取压缩包的上级路径错误");
+    let call_tree_idx_path = target.join("call_tree".replace("\\", ""));
+    if !call_tree_idx_path.exists() {
+        if let Ok(file) = File::create(call_tree_idx_path) {
+            let mut writer = BufWriter::new(file);
+            // 多行数据
+            let lines = ["这是第一行", "这是第二行", "这是第三行"];
+            // 写入多行数据
+            for line in lines.iter() {
+                if let Err(e) = writeln!(writer, "{}", line) {
+                    eprintln!("写入数据时发生错误: {}", e);
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -91,7 +113,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unzip(){
+    fn test_unzip() {
         let path = Path::new("D:\\dump\\20240726XNJK[非涉密].zip");
         analysis(path.as_str());
     }
