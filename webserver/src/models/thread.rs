@@ -18,6 +18,12 @@ pub struct Thread {
     pub address: String,
     pub frames: Vec<CallFrame>,
 }
+lazy_static::lazy_static! {
+    static ref REGEX_MAIN_INFO:Regex = Regex::new(
+        r"^(?P<name>.+?) #(?P<number>\d+)(?: daemon)?(?: prio=(?P<prio>\d+))?(?: os_prio=(?P<os_prio>\d+))? tid=(?P<tid>0x[0-9a-fA-F]+) nid=(?P<nid>0x[0-9a-fA-F]+) (?P<state>[^\[]*)\[(?P<hex_address>0x[0-9a-fA-F]+)\]$"
+    ).unwrap();
+    static ref REGEX_STATE:Regex = Regex::new(r"State:\s(\w+)").unwrap();
+}
 
 impl Thread {
     pub fn new(lines: Vec<String>) -> Result<Self, ThreadError> {
@@ -55,25 +61,8 @@ impl Thread {
 
     pub fn parse_thread_info(
         line: &str,
-    ) -> Result<
-        (
-            String,
-            String,
-            bool,
-            u16,
-            u32,
-            u64,
-            u64,
-            String,
-        ),
-        ThreadError,
-    > {
-        let reg = Regex::new(
-            r"^(?P<name>.+?) #(?P<number>\d+) (?P<daemon>daemon)?(?:prio=(?P<prio>\d+))? (?:os_prio=(?P<os_prio>\d+))? tid=(?P<tid>0x[0-9a-fA-F]+) nid=(?P<nid>0x[0-9a-fA-F]+) (?P<state>[^\[]+) \[(?P<hex_address>0x[0-9a-fA-F]+)\]$"
-
-   ).unwrap();
-
-        if let Some(caps) = reg.captures(line) {
+    ) -> Result<(String, String, bool, u16, u32, u64, u64, String), ThreadError> {
+        if let Some(caps) = REGEX_MAIN_INFO.captures(line) {
             let name = caps
                 .name("name")
                 .ok_or(ThreadError::MissingField)?
@@ -134,7 +123,7 @@ impl Thread {
                 hex_address,
             ))
         } else {
-            Err(ThreadError::ParseError("解析失败".to_string()))
+            Err(ThreadError::ParseError(format!("{}无法解析",line)))
         }
     }
 }
@@ -152,11 +141,9 @@ pub enum ThreadStatus {
 impl FromStr for ThreadStatus {
     type Err = ThreadError;
     fn from_str(status: &str) -> Result<Self, Self::Err> {
-        lazy_static::lazy_static! {
-            static ref REGEX:Regex = Regex::new(r"State:\s(\w+)").unwrap();
-        }
+       
 
-        if let Some(captures) = REGEX.captures(status) {
+        if let Some(captures) = REGEX_STATE.captures(status) {
             match &captures[1] {
                 "NEW" => Ok(ThreadStatus::New),
                 "WAITING" => Ok(ThreadStatus::Waiting),
@@ -182,7 +169,7 @@ pub struct CallFrame {
 
 impl CallFrame {
     pub fn new(frame_info: &str) -> Result<Self, ThreadError> {
-        let parts: Option<(&str, &str)> = frame_info.split_once(" ");
+        let parts: Option<(&str, &str)> = frame_info.trim().split_once(" ");
         let (method_name, class_name, line_number) = match parts {
             Some((key, method_info)) => match key {
                 "-" => {
@@ -196,25 +183,33 @@ impl CallFrame {
                     (None, class_name, None)
                 }
                 "at" => {
-                    let method_parts: Vec<&str> = method_info.split('(').collect();
-                    let method_name = Some(method_parts[0].to_string());
+                    let reg = Regex::new(r"at\s+([\w.$]+)\.(\w+)\(([^:]+)(?::(\d+))?\)").unwrap();
+                    match reg.captures(frame_info.trim()) {
+                        Some(caps) => {
+                            let class_name = caps[1].to_string();
+                            let method_name = caps[2].to_string();
 
-                    let file_info = method_parts.get(1).map(|s| s.trim_end_matches(')'));
-                    let (class_name, line_number) = if let Some(file_info) = file_info {
-                        let file_parts: Vec<&str> = file_info.split(':').collect();
-                        let class_name = file_parts
-                            .get(0)
-                            .map(|s| s.split(".").next().unwrap().to_string())
-                            .expect(format!("无法识别的class name:{}", file_info).as_str());
-                        let line_number: Option<u32> =
-                            file_parts.get(1).map(|s| s.parse().unwrap());
-                        (class_name, line_number)
-                    } else {
-                        ("Unknown Source".to_string(), None)
-                    };
-                    (method_name, class_name, line_number)
+                            let file_name = caps[3].to_string();
+                            let line_number: Option<u32> = caps
+                                .get(4)
+                                .map(|m| m.as_str().parse().expect("行号解析失败"));
+                            let reference = format!("{}.{}", class_name, method_name);
+                            (Some(reference), file_name, line_number)
+                        }
+                        None => {
+                            return Err(ThreadError::ParseError(format!(
+                                "无法解析{}",
+                                frame_info.trim()
+                            )))
+                        }
+                    }
                 }
-                _ => return Err(ThreadError::ParseError("".to_string())),
+                _ => {
+                    return Err(ThreadError::ParseError(format!(
+                        "无法识别的方法开头：{}",
+                        key
+                    )))
+                }
             },
             None => return Err(ThreadError::ParseError("分割失败".to_string())),
         };

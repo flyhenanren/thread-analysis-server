@@ -90,8 +90,10 @@ impl CallTree {
 pub mod tests {
     use std::{
         fs,
-        io::{self, BufRead},
+        io::{self, BufRead}, time::SystemTime,
     };
+
+    use chrono::Local;
 
     use crate::models::thread::{self, ThreadStatus};
 
@@ -99,12 +101,17 @@ pub mod tests {
 
     #[test]
     pub fn test() {
-        let dirs = fs::read_dir("D:\\dump\\20240726\\all_threaddump").unwrap();
-
+        let dirs = fs::read_dir("D:\\dump\\a").unwrap();
+        let start = Local::now();        
+        println!("start:{}", start);
         let mut threads = Vec::new();
+        let mut count_file = 0;
+        let mut count_threads = 0;
         for dir in dirs {
+            count_file +=1;
             let entry = dir.unwrap();
             let path = entry.path();
+            println!("{}-读取文件：{:?}",count_file,path);
             let file = fs::File::open(path).unwrap();
             let reader = io::BufReader::new(file);
             let mut lines: Vec<Vec<String>> = Vec::new();
@@ -116,7 +123,7 @@ pub mod tests {
                         if l.is_empty() {
                             continue;
                         }
-                        if l.contains("prio=") {
+                        if l.contains("nid=") {
                             start = true;
                             if !current_group.is_empty() {
                                 lines.push(current_group);
@@ -133,15 +140,24 @@ pub mod tests {
             if !current_group.is_empty() {
                 lines.push(current_group);
             }
+            let build = Local::now();
+            println!("{}-开始构建：{}，共{}行",count_file, build, lines.len());
             for group in lines {
                 let thread = Thread::new(group);
+                count_threads +=1;
                 match thread {
                     Ok(t) => threads.push(t),
                     Err(e) => println!("{}", e),
                 }
             }
+            let build = Local::now();
+            println!("{}-构建结束：{}", count_file,build);
         }
+        let build = Local::now();
+        println!("调用树处理：{}，共：{}", build, count_threads);
         let call_tree = CallTree::new(threads);
+        let build = Local::now();
+        println!("调用树构建完毕：{}", build);
         println!("{:?}", call_tree)
     }
 }
