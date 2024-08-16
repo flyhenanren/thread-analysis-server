@@ -1,84 +1,143 @@
-use std::process::id;
 use std::str::FromStr;
 
 use regex::Regex;
 use serde::Serialize;
 
 use crate::error::ThreadError;
-use crate::state;
 
 #[derive(Serialize, Debug, PartialEq)]
 pub struct Thread {
     pub id: String,
     pub name: String,
+    pub daemon: bool,
     pub prio: u16,
     pub os_prio: u32,
     pub tid: u64,
     pub nid: u64,
     pub status: ThreadStatus,
+    pub address: String,
     pub frames: Vec<CallFrame>,
 }
 
 impl Thread {
     pub fn new(lines: Vec<String>) -> Result<Self, ThreadError> {
-        let thread_info: Vec<&str> = lines[0].split_whitespace().collect();
-        let status: ThreadStatus = match ThreadStatus::from_str(&lines[1]) {
+        let (name, id, daemon, prio, os_prio, tid, nid, address) =
+            Self::parse_thread_info(&lines[0])?;
+        let status = match ThreadStatus::from_str(&lines[1]) {
             Ok(status) => status,
             Err(e) => {
                 return Err(ThreadError::ParseError(format!(
                     "解析数据行:{}\r\n时错误。\r\nerror:{}",
-                    lines[1],
+                    lines[1].to_string(),
                     e.to_string()
                 )))
             }
         };
-
         let call_info = &lines[2..=lines.len() - 1];
         let mut frames: Vec<CallFrame> = Vec::with_capacity(call_info.len());
         for call in call_info {
             frames.insert(0, CallFrame::new(&call)?);
         }
-        let tid_str = thread_info[4]
-            .split("=")
-            .nth(1)
-            .expect(format!("tid 解析错误：{}",thread_info[4]).as_str())
-            .trim_start_matches("0x");
-        let tid = match u64::from_str_radix(tid_str, 16){
-            Ok(tid) => tid,
-            Err(e) => return Err(ThreadError::ParseError(format!("解析tid:{}时错误:{}", tid_str,e.to_string())))
-        };
 
-        let nid_str = thread_info[5]
-            .split("=")
-            .nth(1)
-            .expect(format!("nid 解析错误：{}",thread_info[4]).as_str())
-            .trim_start_matches("0x");
-        let nid = u64::from_str_radix(nid_str, 16).unwrap();
         Ok(Thread {
-            id: thread_info[1].to_string(),
-            name: thread_info[0].trim_matches('\"').to_string(),
-            prio: thread_info[2]
-                .split("=")
-                .nth(1)
-                .expect(format!("prio 解析错误：{}",thread_info[2]).as_str())
-                .parse::<u16>()
-                .expect(format!("prio 解析错误：{}",thread_info[2]).as_str()),
-            os_prio: thread_info[3]
-                .split("=")
-                .nth(1)
-                .expect(format!("os_prio 解析错误：{}",thread_info[3]).as_str())
-                .parse::<u32>()
-                .expect(format!("os_prio 解析错误：{}",thread_info[3]).as_str()),
+            id,
+            name,
+            daemon,
+            prio,
+            os_prio,
             tid,
             nid,
             status,
             frames,
+            address,
         })
     }
+
+    pub fn parse_thread_info(
+        line: &str,
+    ) -> Result<
+        (
+            String,
+            String,
+            bool,
+            u16,
+            u32,
+            u64,
+            u64,
+            String,
+        ),
+        ThreadError,
+    > {
+        let reg = Regex::new(
+            r"^(?P<name>.+?) #(?P<number>\d+) (?P<daemon>daemon)?(?:prio=(?P<prio>\d+))? (?:os_prio=(?P<os_prio>\d+))? tid=(?P<tid>0x[0-9a-fA-F]+) nid=(?P<nid>0x[0-9a-fA-F]+) (?P<state>[^\[]+) \[(?P<hex_address>0x[0-9a-fA-F]+)\]$"
+
+   ).unwrap();
+
+        if let Some(caps) = reg.captures(line) {
+            let name = caps
+                .name("name")
+                .ok_or(ThreadError::MissingField)?
+                .as_str()
+                .trim_matches('\"')
+                .to_string();
+            let id = caps
+                .name("number")
+                .ok_or(ThreadError::MissingField)?
+                .as_str()
+                .to_string();
+            let id = format!("#{}", id);
+            let daemon = caps.name("daemon").is_some();
+            let prio = caps
+                .name("prio")
+                .map(|m| {
+                    m.as_str()
+                        .parse::<u16>()
+                        .map_err(ThreadError::ParseIntError)
+                })
+                .transpose()?;
+            let os_prio = caps
+                .name("os_prio")
+                .map(|m| {
+                    m.as_str()
+                        .parse::<u32>()
+                        .map_err(ThreadError::ParseIntError)
+                })
+                .transpose()?;
+            let tid_str = caps
+                .name("tid")
+                .ok_or(ThreadError::MissingField)?
+                .as_str()
+                .strip_prefix("0x")
+                .ok_or(ThreadError::InvalidStatus)?;
+            let tid = u64::from_str_radix(tid_str, 16).map_err(ThreadError::ParseIntError)?;
+            let nid_str = caps
+                .name("nid")
+                .ok_or(ThreadError::MissingField)?
+                .as_str()
+                .strip_prefix("0x")
+                .ok_or(ThreadError::InvalidStatus)?;
+            let nid = u64::from_str_radix(nid_str, 16).map_err(ThreadError::ParseIntError)?;
+
+            let hex_address = caps
+                .name("hex_address")
+                .ok_or(ThreadError::MissingField)?
+                .as_str()
+                .to_string();
+            Ok((
+                name,
+                id,
+                daemon,
+                prio.unwrap_or_default(),
+                os_prio.unwrap_or_default(),
+                tid,
+                nid,
+                hex_address,
+            ))
+        } else {
+            Err(ThreadError::ParseError("解析失败".to_string()))
+        }
+    }
 }
-
-
-
 
 #[derive(Serialize, Debug, PartialEq)]
 pub enum ThreadStatus {
@@ -283,6 +342,8 @@ pub mod tests {
             nid: 0x2f03,
             status: ThreadStatus::Runnable,
             frames,
+            address: "0x00007f3d80f21000".to_owned(),
+            daemon: false,
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -335,6 +396,8 @@ pub mod tests {
             nid: 0x2f04,
             status: ThreadStatus::Blocked,
             frames,
+            daemon: false,
+            address: "0x00007f3d80f22000".to_owned(),
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -410,6 +473,8 @@ pub mod tests {
             nid: 0x2f05,
             status: ThreadStatus::Waiting,
             frames,
+            daemon: false,
+            address: "0x00007f3d80f23000".to_owned(),
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -459,6 +524,8 @@ pub mod tests {
             nid: 0x2f06,
             status: ThreadStatus::TimedWaiting,
             frames,
+            daemon: false,
+            address: "0x00007f3d80f24000".to_owned(),
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -533,6 +600,8 @@ pub mod tests {
             nid: 0x2f09,
             status: ThreadStatus::TimedWaiting,
             frames,
+            daemon: false,
+            address: "0x00007f3d80f26000".to_owned(),
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -609,6 +678,8 @@ pub mod tests {
             nid: 0x2f0a,
             status: ThreadStatus::TimedWaiting,
             frames,
+            daemon: false,
+            address: "0x00007f3d80f27000".to_owned(),
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -685,6 +756,8 @@ pub mod tests {
             nid: 0x2f08,
             status: ThreadStatus::Waiting,
             frames,
+            daemon: false,
+            address: "0x00007f3d80f25000".to_owned(),
         };
         assert_eq!(result.unwrap(), thread)
     }

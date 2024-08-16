@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::fmt;
+use std::{fmt, num::ParseIntError};
 
 
 #[derive(Debug, Serialize)]
@@ -8,10 +8,14 @@ pub enum FileError{
   IllegalName(String)
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub enum ThreadError{
   IllegalStatus(String),
   ParseError(String),
+  RegexError(regex::Error),
+  ParseIntError(ParseIntError),
+  MissingField,
+  InvalidStatus,
 }
 
 impl fmt::Display for FileError{
@@ -26,6 +30,10 @@ impl fmt::Display for ThreadError {
       match self {
           ThreadError::IllegalStatus(s) => write!(f, "Illegal status: {}", s),
           ThreadError::ParseError(s) => write!(f, "Parse Error: {}", s),
+          ThreadError::RegexError(e) => write!(f, "Regex Error:{}", e),
+          ThreadError::ParseIntError(e) => write!(f, "ParseIntError:{}",e),
+          ThreadError::MissingField => write!(f, "MissingField"),
+          ThreadError::InvalidStatus => write!(f, "InvalidStatus"),
       }
   }
 }
