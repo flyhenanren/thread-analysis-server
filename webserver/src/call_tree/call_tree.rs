@@ -17,44 +17,36 @@ impl CallTree {
         let mut root: HashMap<String, CallTree> = HashMap::new();
         let frames_count: usize = threads.iter().map(|t| t.frames.len()).sum();
 
-        let percent = 100.0 / frames_count as f64; // 每个方法帧的占比
+        let percent = 100.0 / threads.len() as f64; // 每个方法帧的占比
 
         for thread in threads {
-            Self::convert_to_call_tree(thread, &mut root, percent);
-            println!("完成一轮");
-            for ele in &root {
-                println!("{:?}", ele.1);
+            if thread.frames.len() > 0 {
+                Self::convert_to_call_tree(thread, &mut root, percent);    
             }
         }
-
-        root.into_iter().next().map_or_else(
-            || CallTree {
-                method_name: String::new(),
-                line: 0,
-                time: 0,
-                percent: 0.0,
-                count: 0,
-                next: None,
-            },
-            |(_, tree)| tree,
-        )
+        let next_node:Vec<Box<CallTree>> = root.into_values().map(|t| Box::new(t)).collect();
+        CallTree {
+            method_name:"all Threads".to_string(),
+            line: 0,
+            time: 0,
+            percent: 100.0,
+            count: 1,
+            next: Some(next_node),
+        }
     }
 
     fn convert_to_call_tree(thread: Thread, root: &mut HashMap<String, CallTree>, percent: f64) {
         let mut path: Vec<CallFrame> = thread.frames;
-        if path.len() == 0 {
-            ()
-        }
         if let Some(root_frame) = path.pop() {
             if let Frame::MethodCall = &root_frame.frame {
                 let method_name = root_frame.method_name.clone().unwrap_or_default();
                 let line = root_frame.line_number.unwrap_or_default();
-                let root_node = root.entry(method_name.clone()).or_insert(CallTree {
+                let root_node: &mut CallTree = root.entry(method_name.clone()).or_insert(CallTree {
                     method_name,
                     line,
-                    time: 0,
+                    time: 15,
                     percent: 0.0,
-                    count: 0,
+                    count: 1,
                     next: None,
                 });
                 Self::build_tree_from_frames(path, root_node, percent);
@@ -62,27 +54,18 @@ impl CallTree {
         }
     }
     fn build_tree_from_frames(mut frames: Vec<CallFrame>, parent_node: &mut CallTree, percent: f64) {
-        // Process each frame in the current level
         if let Some(frame) = frames.pop() {
             let method_name = frame.method_name.as_ref().unwrap_or(&String::new()).clone();
-
-            // Check if the current frame exists in the parent node's next nodes
             let next_nodes = parent_node.next.get_or_insert_with(Vec::new);
-
-            // Try to find the node in the current next nodes
             let existing_node = next_nodes
                 .iter_mut()
                 .find(|node| node.method_name == method_name);
-
             if let Some(node) = existing_node {
-                // Update existing node
                 node.count += 1;
                 node.percent += percent;
                 node.time += 15;
-
                 Self::build_tree_from_frames(frames, node, percent);
             } else {
-                // Create a new node if not found
                 let mut new_node = CallTree {
                     method_name: method_name.clone(),
                     line: frame.line_number.unwrap_or_default(),
@@ -91,13 +74,8 @@ impl CallTree {
                     count: 1,
                     next: None,
                 };
-
-                // Recursively process the remaining frames for this new node
                 Self::build_tree_from_frames(frames, &mut new_node, percent);
-
-                // Add the new node to the next nodes of the parent
                 next_nodes.push(Box::new(new_node));
-
             }
         };
     }
