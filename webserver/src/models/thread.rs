@@ -23,6 +23,7 @@ lazy_static::lazy_static! {
         r"^(?P<name>.+?) #(?P<number>\d+)(?: daemon)?(?: prio=(?P<prio>\d+))?(?: os_prio=(?P<os_prio>\d+))? tid=(?P<tid>0x[0-9a-fA-F]+) nid=(?P<nid>0x[0-9a-fA-F]+) (?P<state>[^\[]*)\[(?P<hex_address>0x[0-9a-fA-F]+)\]$"
     ).unwrap();
     static ref REGEX_STATE:Regex = Regex::new(r"State:\s(\w+)").unwrap();
+    static ref REGEX_FRAME:Regex = Regex::new(r"at\s+([\w.$]+)\.([\w$]+(?:\$\$Lambda\$\d+/\d+)?)(?:\.(\w+))?\(([^:]+|Unknown Source)(?::(\d+))?\)").unwrap();
 }
 
 impl Thread {
@@ -123,7 +124,7 @@ impl Thread {
                 hex_address,
             ))
         } else {
-            Err(ThreadError::ParseError(format!("{}无法解析",line)))
+            Err(ThreadError::ParseError(format!("无法解析堆栈信息:{}",line)))
         }
     }
 }
@@ -183,22 +184,21 @@ impl CallFrame {
                     (None, class_name, None)
                 }
                 "at" => {
-                    let reg = Regex::new(r"at\s+([\w.$]+)\.(\w+)\(([^:]+)(?::(\d+))?\)").unwrap();
-                    match reg.captures(frame_info.trim()) {
+                    match REGEX_FRAME.captures(frame_info.trim()) {
                         Some(caps) => {
                             let class_name = caps[1].to_string();
                             let method_name = caps[2].to_string();
 
-                            let file_name = caps[3].to_string();
+                            // let file_name = caps.get(4).map_or("None", |m| m.as_str()).to_string();
                             let line_number: Option<u32> = caps
-                                .get(4)
-                                .map(|m| m.as_str().parse().expect("行号解析失败"));
+                                .get(5)
+                                .map(|m| m.as_str().parse().expect(&format!("行号解析失败:{}", m.as_str())));
                             let reference = format!("{}.{}", class_name, method_name);
-                            (Some(reference), file_name, line_number)
+                            (Some(reference), class_name, line_number)
                         }
                         None => {
                             return Err(ThreadError::ParseError(format!(
-                                "无法解析{}",
+                                "无法解析方法：{}",
                                 frame_info.trim()
                             )))
                         }
