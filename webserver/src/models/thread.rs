@@ -43,7 +43,7 @@ impl Thread {
         let call_info = &lines[2..=lines.len() - 1];
         let mut frames: Vec<CallFrame> = Vec::with_capacity(call_info.len());
         for call in call_info {
-            frames.insert(0, CallFrame::new(&call)?);
+            frames.push(CallFrame::new(&call)?);
         }
 
         Ok(Thread {
