@@ -60,6 +60,19 @@ impl Thread {
         })
     }
 
+    pub fn is_sys_thread(lines: &Vec<String>) -> bool{
+        if lines.len() == 1 {
+            return Self::is_jvm_thread(&lines[0])
+        }
+        false
+    }
+
+    fn is_jvm_thread(line: &String) -> bool{
+        line.contains("VM Thread") || line.contains("VM Periodic Task Thread") || line.contains("GC task thread")
+    }
+
+    
+
     pub fn parse_thread_info(
         line: &str,
     ) -> Result<(String, String, bool, u16, u32, u64, u64, String), ThreadError> {
