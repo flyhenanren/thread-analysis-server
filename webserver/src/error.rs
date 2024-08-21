@@ -18,6 +18,11 @@ pub enum ThreadError{
   InvalidStatus,
 }
 
+#[derive(Debug)]
+pub enum FrameError{
+  Unknown(String)
+}
+
 impl fmt::Display for FileError{
     fn fmt(&self, f: &mut fmt::Formatter) ->  Result<(), fmt::Error>{
       write!(f, "{}", self)
@@ -38,5 +43,15 @@ impl fmt::Display for ThreadError {
   }
 }
 
+impl fmt::Display for FrameError{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FrameError::Unknown(str) => write!(f, "Unknown frame: {}", str),
+        }
+    }
+}
+
 // 实现 `std::error::Error` 为 `ThreadError`
 impl std::error::Error for ThreadError {}
+
+impl std::error::Error for FrameError{}

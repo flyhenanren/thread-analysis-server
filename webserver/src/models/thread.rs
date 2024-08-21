@@ -3,7 +3,7 @@ use std::str::FromStr;
 use regex::Regex;
 use serde::Serialize;
 
-use crate::error::ThreadError;
+use crate::error::{FrameError, ThreadError};
 
 #[derive(Serialize, Debug, PartialEq)]
 pub struct Thread {
@@ -248,10 +248,11 @@ pub enum Frame {
         parking_address: u64,
     },
     NativeMethod,
+    Eliminated
 }
 
 impl FromStr for Frame {
-    type Err = ();
+    type Err = FrameError;
 
     fn from_str(frame_info: &str) -> Result<Self, Self::Err> {
         let parts: Vec<&str> = frame_info.split_whitespace().collect();
@@ -273,7 +274,8 @@ impl FromStr for Frame {
                 "parking" => Ok(Frame::Parking {
                     parking_address: extract_address(frame_info),
                 }),
-                _ => Err(()),
+                "eliminated"=> Ok(Frame::Eliminated),
+                _ => Err(FrameError::Unknown(parts[1].to_string())),
             },
             "at" => {
                 if frame_info.contains("(Native Method)") {
@@ -282,7 +284,7 @@ impl FromStr for Frame {
                     Ok(Frame::MethodCall)
                 }
             }
-            _ => Err(()),
+            _ => Err(FrameError::Unknown(parts[0].to_string())),
         }
     }
 }
