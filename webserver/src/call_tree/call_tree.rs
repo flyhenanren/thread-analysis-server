@@ -6,36 +6,22 @@ use crate::models::thread::{CallFrame, Frame, Thread};
 pub struct CallTree {
     method_name: String,
     line: u32,
-    time: u32,
-    percent: f64,
     count: u32,
     next: Option<Vec<Box<CallTree>>>,
 }
 
 impl CallTree {
-    pub fn new(threads: Vec<Thread>) -> CallTree {
+    pub fn new(threads: Vec<Thread>) -> Vec<CallTree> {
         let mut root: HashMap<String, CallTree> = HashMap::new();
-        let frames_count: usize = threads.iter().map(|t| t.frames.len()).sum();
-
-        let percent = 100.0 / threads.len() as f64; // 每个方法帧的占比
-
         for thread in threads {
             if thread.frames.len() > 0 {
-                Self::convert_to_call_tree(thread, &mut root, percent);    
+                Self::convert_to_call_tree(thread, &mut root);    
             }
         }
-        let next_node:Vec<Box<CallTree>> = root.into_values().map(|t| Box::new(t)).collect();
-        CallTree {
-            method_name:"all Threads".to_string(),
-            line: 0,
-            time: 0,
-            percent: 100.0,
-            count: 1,
-            next: Some(next_node),
-        }
+        root.into_values().collect()
     }
 
-    fn convert_to_call_tree(thread: Thread, root: &mut HashMap<String, CallTree>, percent: f64) {
+    fn convert_to_call_tree(thread: Thread, root: &mut HashMap<String, CallTree>) {
         let mut path: Vec<CallFrame> = thread.frames;
         if let Some(root_frame) = path.pop() {
             if let Frame::MethodCall = &root_frame.frame {
@@ -44,16 +30,15 @@ impl CallTree {
                 let root_node: &mut CallTree = root.entry(method_name.clone()).or_insert(CallTree {
                     method_name,
                     line,
-                    time: 15,
-                    percent: 0.0,
-                    count: 1,
+                    count: 0,
                     next: None,
                 });
-                Self::build_tree_from_frames(path, root_node, percent);
+                root_node.count += 1;
+                Self::build_tree_from_frames(path, root_node);
             }
         }
     }
-    fn build_tree_from_frames(mut frames: Vec<CallFrame>, parent_node: &mut CallTree, percent: f64) {
+    fn build_tree_from_frames(mut frames: Vec<CallFrame>, parent_node: &mut CallTree) {
         if let Some(frame) = frames.pop() {
             let method_name = frame.method_name.as_ref().unwrap_or(&String::new()).clone();
             let next_nodes = parent_node.next.get_or_insert_with(Vec::new);
@@ -62,19 +47,15 @@ impl CallTree {
                 .find(|node| node.method_name == method_name);
             if let Some(node) = existing_node {
                 node.count += 1;
-                node.percent += percent;
-                node.time += 15;
-                Self::build_tree_from_frames(frames, node, percent);
+                Self::build_tree_from_frames(frames, node);
             } else {
                 let mut new_node = CallTree {
                     method_name: method_name.clone(),
                     line: frame.line_number.unwrap_or_default(),
-                    time: 15,
-                    percent,
                     count: 1,
                     next: None,
                 };
-                Self::build_tree_from_frames(frames, &mut new_node, percent);
+                Self::build_tree_from_frames(frames, &mut new_node);
                 next_nodes.push(Box::new(new_node));
             }
         };
