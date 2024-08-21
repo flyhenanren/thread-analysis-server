@@ -23,7 +23,7 @@ lazy_static::lazy_static! {
         r"^(?P<name>.+?) #(?P<number>\d+)(?: daemon)?(?: prio=(?P<prio>\d+))?(?: os_prio=(?P<os_prio>\d+))? tid=(?P<tid>0x[0-9a-fA-F]+) nid=(?P<nid>0x[0-9a-fA-F]+) (?P<state>[^\[]*)\[(?P<hex_address>0x[0-9a-fA-F]+)\]$"
     ).unwrap();
     static ref REGEX_STATE:Regex = Regex::new(r"State:\s(\w+)").unwrap();
-    static ref REGEX_FRAME:Regex = Regex::new(r"at\s+([\w.$]+)\.([\w$]+(?:\$\$Lambda\$\d+/\d+)?)(?:\.(\w+))?\(([^:]+|Unknown Source)(?::(\d+))?\)").unwrap();
+    static ref REGEX_FRAME:Regex = Regex::new(r"at\s+([\w.$]+)\.(<init>|[\w$]+(?:\$\$Lambda\$\d+/\d+)?)(?:\.(\w+))?\(([^:]+|Unknown Source)(?::(\d+))?\)").unwrap();
 }
 
 impl Thread {

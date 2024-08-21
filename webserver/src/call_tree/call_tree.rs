@@ -77,9 +77,8 @@ pub mod tests {
 
     #[test]
     pub fn test() {
+        let real_start = Local::now();
         let dirs = fs::read_dir("D:\\dump\\a").unwrap();
-        let start = Local::now();
-        println!("start:{}", start);
         let mut threads = Vec::new();
         let mut count_file = 0;
         let mut count_threads = 0;
@@ -117,8 +116,8 @@ pub mod tests {
             if !current_group.is_empty() {
                 lines.push(current_group);
             }
-            let build = Local::now();
-            println!("{}-开始构建：{}，共{}行", count_file, build, lines.len());
+            let build_start = Local::now();
+            println!("{}-开始构建：{}，共{}行", count_file, build_start.timestamp_millis(), lines.len());
             for group in lines {
                 if !Thread::is_sys_thread(&group) {
                     let thread = Thread::new(group);
@@ -129,14 +128,17 @@ pub mod tests {
                     }
                 };
             }
-            let build = Local::now();
-            println!("{}-构建结束：{}", count_file, build);
+            let build_end = Local::now();
+            println!("{}-构建结束：{}", count_file, build_end.timestamp_millis() - build_start.timestamp_millis());
         }
-        let build = Local::now();
-        println!("调用树处理：{}，共：{}", build, count_threads);
-        let call_tree = CallTree::new(threads);
-        let build = Local::now();
-        println!("调用树构建完毕：{}", build);
-        println!("{:?}", call_tree)
+        println!("调用树处理：共：{}",  count_threads);
+        let build_start = Local::now();
+        let _call_tree = CallTree::new(threads);
+        let build_end = Local::now();
+        println!("调用树构建完毕：{}, 构建树形耗时：{}， 共耗时：{}", 
+        build_end.timestamp_millis(), 
+        build_end.timestamp_millis() - build_start.timestamp_millis(),
+        build_end.timestamp_millis()- real_start.timestamp_millis());
+
     }
 }
