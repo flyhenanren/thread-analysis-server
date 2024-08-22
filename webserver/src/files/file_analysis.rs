@@ -5,6 +5,8 @@ use std::path::Path;
 use crate::models::file_info::FileType;
 use crate::{files::file_index, files::zip_extract, models::file_info::FileInfo};
 
+use super::file_index::FileIndex;
+
 pub fn analysis(path: &str) {
     let file_type = get_file_type(path)
         .unwrap_or_else(|e| {
@@ -18,34 +20,29 @@ pub fn analysis(path: &str) {
     };
     let file_info = match file_type {
         1 => {
-            if file_index::exist_file_index(path) {
-                match file_index::read_file_index(path) {
+            if file_index::SourceFile::exist_index(path) {
+                match file_index::SourceFile::read_index(path) {
                     Ok(file) => file,
                     Err(e) => {
                         println!("{:?}", e);
                         let file_info = extract_files(source_path);
-                        file_index::write_file_index(&file_info, path).ok();
+                        file_index::SourceFile::write_index(&file_info, path).ok();
                         file_info
                     }
                 }
             } else {
                 let file_info = extract_files(source_path);
-                file_index::write_file_index(&file_info, path).ok();
+                file_index::SourceFile::write_index(&file_info, path).ok();
                 file_info
             }
         },
         _ => {
             let extract_files = zip_extract::unzip_and_extract_file(source_path)
                 .unwrap_or_else(|e| panic!("解析文件时发生错误：{}", e));
-            file_index::write_file_index(&extract_files, path).ok();
+            file_index::SourceFile::write_index(&extract_files, path).ok();
             extract_files
         }
     };
-    
-    let cpu_file: Vec<&FileInfo> = file_info
-        .iter()
-        .filter(|f| f.file_type == FileType::CpuTop)
-        .collect();
     let stack_file: Vec<&FileInfo> = file_info
         .iter()
         .filter(|f| f.file_type == FileType::StackTrace)
@@ -57,6 +54,15 @@ pub fn analysis(path: &str) {
 
 }
 
+
+fn analysis_cpu(file_info: &Vec<FileInfo>) {
+
+    let cpu_file: Vec<&FileInfo> = file_info
+    .iter()
+    .filter(|f| f.file_type == FileType::CpuTop)
+    .collect();
+
+}
 /**
  * 获取选中的路径类型，是文件夹还是压缩包
  */
