@@ -2,28 +2,59 @@ use std::fs::{self, File};
 use std::io::{self, BufWriter, Error, Read, Write};
 use std::path::Path;
 
-use crate::{files::zip_extract, models::file_info::FileInfo};
+use crate::models::file_info::FileType;
+use crate::{files::file_index, files::zip_extract, models::file_info::FileInfo};
 
 pub fn analysis(path: &str) {
     let file_type = get_file_type(path)
-        .map_err(|e| {
+        .unwrap_or_else(|e| {
             panic!("文件类型校验时发生错误：{}", e);
-        })
-        .unwrap();
+        });
     let source_path = Path::new(path);
-
-    let file_info: Vec<FileInfo> = match file_type {
-        1 => zip_extract::extract_file(&source_path)
-            .map_err(|e| {
-                panic!("读取文件时发生错误：{}", e);
-            })
-            .unwrap(),
-        _ => zip_extract::unzip_and_extract_file(&source_path)
-            .map_err(|e| {
-                panic!("解析文件时发生错误：{}", e);
-            })
-            .unwrap(),
+     // 封装处理文件提取和索引的逻辑
+     let extract_files = |path: &Path| -> Vec<FileInfo> {
+        zip_extract::extract_file(path)
+            .unwrap_or_else(|e| panic!("读取文件时发生错误：{}", e))
     };
+    let file_info = match file_type {
+        1 => {
+            if file_index::exist_file_index(path) {
+                match file_index::read_file_index(path) {
+                    Ok(file) => file,
+                    Err(e) => {
+                        println!("{:?}", e);
+                        let file_info = extract_files(source_path);
+                        file_index::write_file_index(&file_info, path).ok();
+                        file_info
+                    }
+                }
+            } else {
+                let file_info = extract_files(source_path);
+                file_index::write_file_index(&file_info, path).ok();
+                file_info
+            }
+        },
+        _ => {
+            let extract_files = zip_extract::unzip_and_extract_file(source_path)
+                .unwrap_or_else(|e| panic!("解析文件时发生错误：{}", e));
+            file_index::write_file_index(&extract_files, path).ok();
+            extract_files
+        }
+    };
+    
+    let cpu_file: Vec<&FileInfo> = file_info
+        .iter()
+        .filter(|f| f.file_type == FileType::CpuTop)
+        .collect();
+    let stack_file: Vec<&FileInfo> = file_info
+        .iter()
+        .filter(|f| f.file_type == FileType::StackTrace)
+        .collect();
+    let gc_file: Vec<&FileInfo> = file_info
+        .iter()
+        .filter(|f| f.file_type == FileType::Gc)
+        .collect();
+
 }
 
 /**
@@ -115,6 +146,12 @@ mod tests {
     #[test]
     fn test_unzip() {
         let path = Path::new("D:\\dump\\20240726XNJK[非涉密].zip");
+        analysis(path.as_str());
+    }
+
+    #[test]
+    fn test_walk_dir() {
+        let path = Path::new("D:\\dump\\20240726");
         analysis(path.as_str());
     }
 }

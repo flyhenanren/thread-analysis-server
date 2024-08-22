@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::config::EnvVars;
 
-#[derive(Serialize,Deserialize, Debug, Clone)]
+#[derive(Serialize,Deserialize, Debug, Clone, PartialEq)]
 pub struct FileInfo {
     pub path: String,
     pub file_type: FileType,
@@ -19,7 +19,7 @@ impl From<web::Json<FileInfo>> for FileInfo {
 }
 
 impl FileInfo {
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(path: &PathBuf) -> Self {
         let file_name = path
             .file_name()
             .and_then(|os_str| os_str.to_str())
@@ -48,7 +48,7 @@ impl FileInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum FileType {
     CpuThread,
     CpuTop,

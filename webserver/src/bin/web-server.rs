@@ -38,6 +38,6 @@ async fn main() -> io::Result<()> {
             .configure(general_routers)
             .configure(file_routes)
     };
-
+    println!("server startup on 3000");
     HttpServer::new(app).bind("127.0.0.1:3000")?.run().await
 }

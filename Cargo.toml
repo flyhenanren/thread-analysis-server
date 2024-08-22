@@ -1,2 +1,6 @@
 [workspace]
 members = ["webserver"]
+
+# 对于 Windows 系统，设置 `--windows-subsystem=windows` 隐藏控制台窗口
+[profile.release]
+link_args = ["-subsystem:windows"]

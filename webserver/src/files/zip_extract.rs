@@ -1,5 +1,5 @@
 use std::{fs, io};
-use std::io::{copy};
+use std::io::{copy, Read};
 use std::path::{Path, PathBuf};
 
 use crate::models::file_info::FileInfo;
@@ -35,7 +35,7 @@ pub fn unzip_and_extract_file(source: &Path) -> io::Result<Vec<FileInfo>> {
                             if let Err(e) = copy(&mut file, &mut target_file) {
                                 eprintln!("Failed to copy file to {:?}: {}", file_path, e);
                             }
-                            file_mapping.push(FileInfo::new(file_path));
+                            file_mapping.push(FileInfo::new(&file_path));
                         }
                         Err(e) => eprintln!("Failed to open or create file {:?}: {}", file_path, e),
                     }
@@ -47,6 +47,24 @@ pub fn unzip_and_extract_file(source: &Path) -> io::Result<Vec<FileInfo>> {
     Ok(file_mapping)
 }
 
-pub fn extract_file(source: &Path)  -> io::Result<Vec<FileInfo>> {
-    Ok(vec![])
+pub fn extract_file(target: &Path)  -> io::Result<Vec<FileInfo>> {
+    let mut file_mapping:Vec<FileInfo> = vec![];
+    if target.is_dir() {
+        for entry in fs::read_dir(target)?{
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.is_dir() {
+                // 如果是文件夹，递归处理
+                let mut children = extract_file(&path)?;
+                if children.len() > 0 {
+                    file_mapping.append(&mut children);
+                }
+            } else if path.is_file() {
+                // 如果是文件，读取内容
+                file_mapping.push(FileInfo::new(&entry.path()))
+            }
+        }
+    }
+    Ok(file_mapping)
 }

@@ -1,11 +1,11 @@
 use std::str::FromStr;
 
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::{FrameError, ThreadError};
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Thread {
     pub id: String,
     pub name: String,
@@ -143,7 +143,7 @@ impl Thread {
     }
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum ThreadStatus {
     Runnable,
     Blocked,
@@ -172,7 +172,7 @@ impl FromStr for ThreadStatus {
     }
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct CallFrame {
     pub class_name: String,
     pub method_name: Option<String>,
@@ -234,7 +234,7 @@ impl CallFrame {
         Err(ThreadError::ParseError("分割失败".to_string()))
     }
 }
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize,Deserialize, Debug, PartialEq)]
 pub enum Frame {
     MethodCall,
     Lock {
@@ -297,7 +297,7 @@ fn extract_address(input: &str) -> u64 {
     }
     0x0000000000000000
 }
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize,Deserialize, Debug, PartialEq)]
 pub enum MonitorAction {
     WaitingToLock,
     WaitingOn,
