@@ -7,10 +7,10 @@ use crate::error::{FrameError, ThreadError};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Thread {
-    pub id: String,
+    pub id: Option<String>,
     pub name: String,
     pub daemon: bool,
-    pub prio: u16,
+    pub prio: Option<u16>,
     pub os_prio: u32,
     pub tid: u64,
     pub nid: u64,
@@ -20,7 +20,7 @@ pub struct Thread {
 }
 lazy_static::lazy_static! {
     static ref REGEX_MAIN_INFO:Regex = Regex::new(
-        r"^(?P<name>.+?) #(?P<number>\d+)(?: daemon)?(?: prio=(?P<prio>\d+))?(?: os_prio=(?P<os_prio>\d+))? tid=(?P<tid>0x[0-9a-fA-F]+) nid=(?P<nid>0x[0-9a-fA-F]+) (?P<state>[^\[]*)\[(?P<hex_address>0x[0-9a-fA-F]+)\]$"
+        r#"^(?P<name>"[^"]*")(?: #(?P<number>\d+))?(?: prio=(?P<prio>\d+))?(?: os_prio=(?P<os_prio>\d+))? tid=(?P<tid>0x[0-9a-fA-F]+) nid=(?P<nid>0x[0-9a-fA-F]+) (?P<state>[^\[]*)(?:\[(?P<hex_address>0x[0-9a-fA-F]+)\])?$"#
     ).unwrap();
     static ref REGEX_STATE:Regex = Regex::new(r"State:\s(\w+)").unwrap();
     static ref REGEX_FRAME:Regex = Regex::new(r"at\s+([\w.$]+)\.(<init>|[\w$]+(?:\$\$Lambda\$\d+/\d+)?)(?:\.(\w+))?\(([^:]+|Unknown Source)(?::(\d+))?\)").unwrap();
@@ -75,7 +75,7 @@ impl Thread {
 
     pub fn parse_thread_info(
         line: &str,
-    ) -> Result<(String, String, bool, u16, u32, u64, u64, String), ThreadError> {
+    ) -> Result<(String, Option<String>, bool, Option<u16>, u32, u64, u64, String), ThreadError> {
         if let Some(caps) = REGEX_MAIN_INFO.captures(line) {
             let name = caps
                 .name("name")
@@ -83,10 +83,10 @@ impl Thread {
                 .as_str()
                 .trim_matches('\"')
                 .to_string();
-            let id = format!("#{}", caps
-            .name("number")
-            .ok_or(ThreadError::MissingField)?
-            .as_str());
+             let id = match caps.name("number"){
+                Some(number)  => Some(format!("#{}", number.as_str())),
+                None => None,
+            };
             let daemon = caps.name("daemon").is_some();
             let prio = caps
                 .name("prio")
@@ -128,7 +128,7 @@ impl Thread {
                 name,
                 id,
                 daemon,
-                prio.unwrap_or_default(),
+                prio,
                 os_prio.unwrap_or_default(),
                 tid,
                 nid,
@@ -342,9 +342,9 @@ pub mod tests {
         });
         frames.reverse();
         let thread = Thread {
-            id: "#1".to_string(),
+            id: Some("#1".to_string()),
             name: "Thread-1".to_string(),
-            prio: 5,
+            prio: Some(5),
             os_prio: 0,
             tid: 0x00007f3d70001800,
             nid: 0x2f03,
@@ -397,9 +397,9 @@ pub mod tests {
         });
         frames.reverse();
         let thread = Thread {
-            id: "#2".to_string(),
+            id: Some("#2".to_string()),
             name: "Thread-2".to_string(),
-            prio: 5,
+            prio: Some(5),
             os_prio: 0,
             tid: 0x00007f3d70002800,
             nid: 0x2f04,
@@ -475,9 +475,9 @@ pub mod tests {
         });
         frames.reverse();
         let thread = Thread {
-            id: "#3".to_string(),
+            id: Some("#3".to_string()),
             name: "Thread-3".to_string(),
-            prio: 5,
+            prio: Some(5),
             os_prio: 0,
             tid: 0x00007f3d70003800,
             nid: 0x2f05,
@@ -526,9 +526,9 @@ pub mod tests {
         });
         frames.reverse();
         let thread = Thread {
-            id: "#4".to_string(),
+            id: Some("#4".to_string()),
             name: "Thread-4".to_string(),
-            prio: 5,
+            prio: Some(5),
             os_prio: 0,
             tid: 0x00007f3d70004800,
             nid: 0x2f06,
@@ -603,9 +603,9 @@ pub mod tests {
         });
         frames.reverse();
         let thread = Thread {
-            id: "#7".to_string(),
+            id: Some("#7".to_string()),
             name: "Thread-7".to_string(),
-            prio: 5,
+            prio: Some(5),
             os_prio: 0,
             tid: 0x00007f3d70007800,
             nid: 0x2f09,
@@ -683,9 +683,9 @@ pub mod tests {
         });
         frames.reverse();
         let thread = Thread {
-            id: "#8".to_string(),
+            id: Some("#8".to_string()),
             name: "Thread-8".to_string(),
-            prio: 5,
+            prio: Some(5),
             os_prio: 0,
             tid: 0x00007f3d70008800,
             nid: 0x2f0a,
@@ -763,9 +763,9 @@ pub mod tests {
         });
         frames.reverse();
         let thread = Thread {
-            id: "#6".to_string(),
+            id: Some("#6".to_string()),
             name: "Thread-6".to_string(),
-            prio: 5,
+            prio: Some(5),
             os_prio: 0,
             tid: 0x00007f3d70006800,
             nid: 0x2f08,
@@ -773,6 +773,73 @@ pub mod tests {
             frames,
             daemon: false,
             address: "0x00007f3d80f25000".to_owned(),
+        };
+        assert_eq!(result.unwrap(), thread)
+    }
+
+
+    #[test]
+    pub fn test_gc_thread() {
+        let lines = vec![
+          "\"GC task thread#0 (ParallelGC)\" os_prio=0 tid=0x0000ffff8c060800 nid=0xec316 runnable ".to_string(),
+    ];
+        let result = Thread::new(lines);
+        let mut frames: Vec<CallFrame> = Vec::new();
+        let thread = Thread {
+            id: None,
+            name: "GC task thread#0 (ParallelGC)".to_string(),
+            prio: None,
+            os_prio: 0,
+            tid: 0x0000ffff8c060800,
+            nid: 0xec316,
+            status: ThreadStatus::Runnable,
+            frames,
+            address: "0x0000000000000000".to_owned(),
+            daemon: false,
+        };
+        assert_eq!(result.unwrap(), thread)
+    }
+
+    #[test]
+    pub fn test_vm_thread() {
+        let lines = vec![
+          "\"VM Thread\" os_prio=0 tid=0x0000ffff8c132000 nid=0xec341 runnable ".to_string(),
+    ];
+        let result = Thread::new(lines);
+        let mut frames: Vec<CallFrame> = Vec::new();
+        let thread = Thread {
+            id: None,
+            name: "VM Thread".to_string(),
+            prio: None,
+            os_prio: 0,
+            tid: 0x0000ffff8c132000,
+            nid: 0xec341,
+            status: ThreadStatus::Runnable,
+            frames,
+            address: "0x0000000000000000".to_owned(),
+            daemon: false,
+        };
+        assert_eq!(result.unwrap(), thread)
+    }
+
+    #[test]
+    pub fn test_task_thread() {
+        let lines = vec![
+          "\"VM Periodic Task Thread\" os_prio=0 tid=0x0000ffff8c1ab000 nid=0xec358 waiting on condition ".to_string(),
+    ];
+        let result = Thread::new(lines);
+        let mut frames: Vec<CallFrame> = Vec::new();
+        let thread = Thread {
+            id: None,
+            name: "VM Periodic Task Thread".to_string(),
+            prio: None,
+            os_prio: 0,
+            tid: 0x0000ffff8c1ab000,
+            nid: 0xec358,
+            status: ThreadStatus::Waiting,
+            frames,
+            address: "0x0000000000000000".to_owned(),
+            daemon: false,
         };
         assert_eq!(result.unwrap(), thread)
     }

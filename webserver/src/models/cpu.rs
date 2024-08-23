@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
-use chrono::NaiveTime;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq)]
+#[derive(Serialize,Deserialize, Debug, PartialEq)]
 pub struct Cpu {
     time: String,
     us: f64,
@@ -11,9 +11,9 @@ pub struct Cpu {
     tasks: u32,
     running: u32,
     sleeping: u32,
-    mem_total: u64,
-    mem_free: u64,
-    mem_used: u64,
+    mem_total: f64,
+    mem_free: f64,
+    mem_used: f64,
     process: Vec<Process>,
 }
 
@@ -23,10 +23,10 @@ impl Cpu {
         let (tasks, running, sleeping) = Self::extract_threads(lines.get(1).unwrap());
         let (us, sy, id) = Self::extract_cpu(lines.get(2).unwrap());
         let (mem_total, mem_free, mem_used) = Self::extract_mem(lines.get(3).unwrap());
-        let mut process:Vec<Process> = Vec::with_capacity(lines.len() - 6);
-        for i in 7..lines.len() {
-            process.push(Process::from_str(&lines[i]).unwrap());
-        }
+        let process:Vec<Process> = Vec::with_capacity(0);
+        // for i in 7..lines.len() {
+        //     process.push(Process::from_str(&lines[i]).unwrap());
+        // }
         Cpu {
             time,
             us,
@@ -88,7 +88,7 @@ impl Cpu {
             .unwrap();
         (us, sy, id)
     }
-    fn extract_mem(line: &str) -> (u64, u64, u64) {
+    fn extract_mem(line: &str) -> (f64, f64, f64) {
         let mem_line = line.split(":").nth(1).unwrap();
         let mem_vec: Vec<&str> = mem_line.split(",").collect();
         let total = mem_vec
@@ -97,7 +97,8 @@ impl Cpu {
             .split_whitespace()
             .next()
             .unwrap()
-            .parse::<u64>()
+            .trim()
+            .parse::<f64>()
             .unwrap();
         let free = mem_vec
             .get(1)
@@ -105,7 +106,8 @@ impl Cpu {
             .split_whitespace()
             .next()
             .unwrap()
-            .parse::<u64>()
+            .trim()
+            .parse::<f64>()
             .unwrap();
         let used = mem_vec
             .get(2)
@@ -113,13 +115,14 @@ impl Cpu {
             .split_whitespace()
             .next()
             .unwrap()
-            .parse::<u64>()
+            .trim()
+            .parse::<f64>()
             .unwrap();
         (total, free, used)
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Serialize,Deserialize, Debug, PartialEq)]
 pub struct Process {
     pid: u32,
     usr: String,

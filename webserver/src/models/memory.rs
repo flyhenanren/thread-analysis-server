@@ -1,23 +1,26 @@
+use chrono::{Duration, NaiveDateTime};
+use serde::{Deserialize, Serialize};
 use core::f64;
+use std::io::{BufRead, BufWriter, Error, Read, Write};
+use std::process::id;
+use std::{fs, io, path::Path};
 
-use chrono::NaiveDateTime;
-
-#[derive(Debug, PartialEq)]
+#[derive(Serialize,Deserialize,Debug, PartialEq)]
 pub struct MemoryInfo {
     time: NaiveDateTime,
     value: Vec<f64>,
 }
-#[derive(Debug, PartialEq)]
+#[derive(Serialize,Deserialize, Debug, PartialEq)]
 pub struct MemoryPercent {
     time: NaiveDateTime,
     value: Vec<f64>,
 }
 
 impl MemoryInfo {
-    pub fn new(time: NaiveDateTime, line: &str) -> Self{
-        MemoryInfo{
-          time,
-          value: Self::split_value(line)
+    pub fn new(time: NaiveDateTime, line: &str) -> Self {
+        MemoryInfo {
+            time,
+            value: Self::split_value(line),
         }
     }
 
@@ -36,28 +39,103 @@ impl MemoryInfo {
     }
 }
 
-
 impl MemoryPercent {
-  pub fn new(time: NaiveDateTime, line: &str) -> Self{
-    MemoryPercent{
-        time,
-        value: Self::split_value(line)
-      }
-  }
+    pub fn new(time: NaiveDateTime, line: &str) -> Self {
+        MemoryPercent {
+            time,
+            value: Self::split_value(line),
+        }
+    }
 
-  fn split_value(line: &str) -> Vec<f64> {
-      line.split_whitespace()
-          .map(|l| {
-              if l.eq("-") {
-                  0.00;
-              }
-              match l.parse::<f64>() {
-                  Ok(value) => value,
-                  Err(e) => 0.00,
-              }
-          })
-          .collect()
-  }
+    fn split_value(line: &str) -> Vec<f64> {
+        line.split_whitespace()
+            .map(|l| {
+                if l.eq("-") {
+                    0.00;
+                }
+                match l.parse::<f64>() {
+                    Ok(value) => value,
+                    Err(e) => 0.00,
+                }
+            })
+            .collect()
+    }
+}
+
+pub fn create(path: &str) -> (MemoryInfo, MemoryPercent) {
+    let file_path = Path::new(path);
+    let path_time = file_path.parent().expect("无法获取上级");
+    let fmt = "%Y%m%d_%H%M%S";
+    let time = NaiveDateTime::parse_from_str(path_time.file_name().unwrap().to_str().unwrap(), fmt)
+        .unwrap();
+    let file = fs::File::open(path).unwrap();
+    let reader = io::BufReader::new(file);
+    let mut idx = 0;
+    let mut mem_info: Option<MemoryInfo> = None;
+    let mut mem_percent: Option<MemoryPercent> = None;
+    for line in reader.lines() {
+        match idx {
+            1 => mem_percent = Some(MemoryPercent::new(time, &line.unwrap())),
+            3 => mem_info = Some(MemoryInfo::new(time, &line.unwrap())),
+            _ => {}
+        }
+        idx += 1;
+    }
+    let mem_info = mem_info.expect("未找到MemoryInfo数据");
+    let mem_percent = mem_percent.expect("未找到MemoryPercent数据");
+    (mem_info, mem_percent)
+}
+
+pub fn batch_crate_memory_info(
+    file_path: &str,
+    start: NaiveDateTime,
+    cycle: i64,
+) -> Vec<MemoryInfo> {
+    let mut memory_info = Vec::new();
+    let file = fs::File::open(file_path).unwrap();
+    let reader = io::BufReader::new(file);
+    let mut flag = false;
+    let mut current_time = start;
+    for line in reader.lines() {
+        let line = line.unwrap();
+        if line.starts_with(S0C) {
+            flag =true;
+            continue;
+        }
+        if flag {
+            let mem_info = MemoryInfo::new(current_time, &line);
+            memory_info.push(mem_info);
+            current_time = current_time.checked_add_signed(Duration::seconds(cycle.into())).expect("时间转换失败");
+            flag = false;
+        }
+    }
+    memory_info
+}
+
+pub fn batch_crate_memory_percent(
+    file_path: &str,
+    start: NaiveDateTime,
+    cycle: u32,
+) -> Vec<MemoryPercent> {
+    let mut memory_info = Vec::new();
+    let file = fs::File::open(file_path).unwrap();
+    let reader = io::BufReader::new(file);
+    let mut flag = false;
+    let mut current_time = start;
+    for line in reader.lines() {
+        let line = line.unwrap();
+        if line.starts_with(S0) {
+            flag =true;
+            continue;
+        }
+        if flag {
+            let mem_info = MemoryPercent::new(current_time, &line);
+            memory_info.push(mem_info);
+            current_time = current_time.checked_add_signed(Duration::seconds(cycle.into())).expect("时间转换失败");
+            flag = false;
+        }
+    }
+    memory_info
 }
 
 pub static S0: &str = "S0";
@@ -81,16 +159,15 @@ pub static CGC: &str = "CGC";
 pub static CGCT: &str = "CGCT";
 pub static GCT: &str = "GCT";
 
-
 #[cfg(test)]
-pub mod tests{
+pub mod tests {
 
     use crate::models::memory;
 
     use super::*;
 
     #[test]
-    pub fn test_gc(){
+    pub fn test_gc() {
         let lines = vec![
             "S0     S1     E      O      M     CCS    YGC     YGCT    FGC    FGCT     GCT   ",
             "0.00 100.00  10.38  16.41  95.61  92.77     16    6.146     0    0.000    6.146",
@@ -110,11 +187,16 @@ pub mod tests{
             if flag {
                 let info: MemoryInfo = MemoryInfo::new(time, line);
                 result.push(info);
-                flag = false;     
+                flag = false;
             }
         }
-        let memory = vec![MemoryInfo{ time, value: vec![0.0,
-            786432.0,0.0,786432.0,5820416.0,625664.0,24850432.0,4080638.3,236180.0,225812.0,26332.0,24429.3,16.0,6.146,0.0,0.000,6.146] }];
+        let memory = vec![MemoryInfo {
+            time,
+            value: vec![
+                0.0, 786432.0, 0.0, 786432.0, 5820416.0, 625664.0, 24850432.0, 4080638.3, 236180.0,
+                225812.0, 26332.0, 24429.3, 16.0, 6.146, 0.0, 0.000, 6.146,
+            ],
+        }];
         assert_eq!(result, memory);
     }
 }

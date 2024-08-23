@@ -1,67 +1,222 @@
+use chrono::{Duration, NaiveDateTime};
+use serde_json::{from_str, to_string};
 use std::fs::{self, File};
-use std::io::{self, BufWriter, Error, Read, Write};
+use std::io::{self, BufRead, BufWriter, Error, Read, Write};
 use std::path::Path;
 
+use crate::models::cpu::{self, Cpu};
 use crate::models::file_info::FileType;
+use crate::models::memory::{self, MemoryInfo};
+use crate::models::thread::Thread;
 use crate::{files::file_index, files::zip_extract, models::file_info::FileInfo};
 
-use super::file_index::FileIndex;
+use super::file_index::{CpuFile, FileIndex, MemoryFile, SourceFile, StackFile};
 
 pub fn analysis(path: &str) {
-    let file_type = get_file_type(path)
-        .unwrap_or_else(|e| {
-            panic!("文件类型校验时发生错误：{}", e);
-        });
+    let exist_source_idx = SourceFile::exist_index(path);
+    let exist_cpu_idx = CpuFile::exist_index(path);
+    let exist_memory_idx = MemoryFile::exist_index(path);
+    let exist_stack_idx = StackFile::exist_index(path);
+    if exist_source_idx && exist_cpu_idx && exist_memory_idx && exist_stack_idx {
+        return;
+    }
+    let file_type = get_file_type(path).unwrap_or_else(|e| {
+        panic!("文件类型校验时发生错误：{}", e);
+    });
     let source_path = Path::new(path);
-     // 封装处理文件提取和索引的逻辑
-     let extract_files = |path: &Path| -> Vec<FileInfo> {
-        zip_extract::extract_file(path)
+    // 提取文件
+    let extract_files = || -> Vec<FileInfo> {
+        zip_extract::extract_file(source_path)
             .unwrap_or_else(|e| panic!("读取文件时发生错误：{}", e))
     };
-    let file_info = match file_type {
-        1 => {
-            if file_index::SourceFile::exist_index(path) {
-                match file_index::SourceFile::read_index(path) {
-                    Ok(file) => file,
-                    Err(e) => {
-                        println!("{:?}", e);
-                        let file_info = extract_files(source_path);
-                        file_index::SourceFile::write_index(&file_info, path).ok();
-                        file_info
-                    }
-                }
-            } else {
-                let file_info = extract_files(source_path);
-                file_index::SourceFile::write_index(&file_info, path).ok();
-                file_info
-            }
-        },
-        _ => {
-            let extract_files = zip_extract::unzip_and_extract_file(source_path)
-                .unwrap_or_else(|e| panic!("解析文件时发生错误：{}", e));
-            file_index::SourceFile::write_index(&extract_files, path).ok();
-            extract_files
-        }
+    let unzip_files = || -> Vec<FileInfo> {
+        zip_extract::unzip_and_extract_file(source_path)
+            .unwrap_or_else(|e| panic!("读取文件时发生错误：{}", e))
     };
-    let stack_file: Vec<&FileInfo> = file_info
-        .iter()
-        .filter(|f| f.file_type == FileType::StackTrace)
-        .collect();
-    let gc_file: Vec<&FileInfo> = file_info
-        .iter()
-        .filter(|f| f.file_type == FileType::Gc)
-        .collect();
+    // 读取或生成文件索引
+    let files: Vec<FileInfo> = match file_type {
+        1 => process_dir_index(path, exist_source_idx, extract_files),
+        _ => process_file_index(path, unzip_files),
+    };
 
+    // 处理CPU索引
+    if !exist_cpu_idx {
+        process_cpu_index(&files, path);
+    }
+
+    // 处理堆栈索引
+    if !exist_stack_idx {
+        process_stack_index(&files, path);
+    }
+
+    // 处理内存索引 (此处可根据需要进行实现)
+    if !exist_memory_idx {
+        process_memory_index(&files, path);
+    }
 }
 
+// 处理文件索引，读取或生成并写入索引文件
+fn process_dir_index(
+    path: &str,
+    exist_source_idx: bool,
+    extract_files: impl FnOnce() -> Vec<FileInfo>,
+) -> Vec<FileInfo> {
+    if exist_source_idx {
+        match SourceFile::read_index(path) {
+            Ok(lines) => lines
+                .into_iter()
+                .map(|line| from_str(&line).expect(&format!("无法解析:{}", &line)))
+                .collect(),
+            Err(e) => {
+                println!("{:?}", e);
+                let file_info = extract_files();
+                write_source_index(&file_info, path);
+                file_info
+            }
+        }
+    } else {
+        let file_info = extract_files();
+        write_source_index(&file_info, path);
+        file_info
+    }
+}
 
-fn analysis_cpu(file_info: &Vec<FileInfo>) {
+// 处理其他文件类型 (非1)
+fn process_file_index(path: &str, extract_files: impl FnOnce() -> Vec<FileInfo>) -> Vec<FileInfo> {
+    let file_info = extract_files();
+    write_source_index(&file_info, path);
+    file_info
+}
 
-    let cpu_file: Vec<&FileInfo> = file_info
-    .iter()
-    .filter(|f| f.file_type == FileType::CpuTop)
-    .collect();
+// 写入源文件索引
+fn write_source_index(file_info: &Vec<FileInfo>, path: &str) {
+    let lines: Vec<String> = file_info
+        .iter()
+        .map(|file| to_string(&file).expect(&format!("序列化错误：{:?}", file)))
+        .collect();
+    SourceFile::write_index(&lines, path).ok();
+}
 
+// 处理CPU索引
+fn process_cpu_index(files: &Vec<FileInfo>, path: &str) {
+    let cpu_file: Vec<FileInfo> = files
+        .iter()
+        .filter(|f| f.file_type == FileType::CpuTop)
+        .cloned()
+        .collect();
+    let mut cpu_lines = Vec::with_capacity(cpu_file.len());
+
+    for file in cpu_file {
+        let file = fs::File::open(file.path).unwrap();
+        let reader = io::BufReader::new(file);
+        let lines_storage: Vec<String> = reader
+            .lines()
+            .take(4) // 仅读取前三行
+            .map(|line| line.unwrap())
+            .collect();
+        let cpu = Cpu::new(lines_storage);
+        let line = to_string(&cpu).expect("解析CPU信息错误");
+        cpu_lines.push(line);
+    }
+    CpuFile::write_index(&cpu_lines, path).ok();
+}
+
+// 处理堆栈索引
+fn process_stack_index(files: &Vec<FileInfo>, path: &str) {
+    let stack_file: Vec<FileInfo> = files
+        .iter()
+        .filter(|f| f.file_type == FileType::StackTrace)
+        .cloned()
+        .collect();
+    let mut stack_lines = Vec::with_capacity(stack_file.len());
+
+    for file in stack_file {
+        let file = fs::File::open(file.path).unwrap();
+        let reader = io::BufReader::new(file);
+        let mut thread_lines: Vec<Vec<String>> = Vec::new();
+        let mut current_group: Vec<String> = Vec::new();
+        let mut start = false;
+        for line in reader.lines() {
+            match line {
+                Ok(l) => {
+                    if l.is_empty() {
+                        start = false;
+                        continue;
+                    }
+                    if l.contains("nid=") {
+                        start = true;
+                        if !current_group.is_empty() {
+                            thread_lines.push(current_group);
+                            current_group = Vec::new();
+                        }
+                    }
+                    if start {
+                        current_group.push(l);
+                    }
+                }
+                Err(_) => {}
+            }
+        }
+        if !current_group.is_empty() {
+            thread_lines.push(current_group);
+        }
+        for group in thread_lines {
+            match Thread::new(group) {
+                Ok(thread) => {
+                    let line = to_string(&thread).expect("解析thread信息错误");
+                    stack_lines.push(line);
+                }
+                Err(e) => println!("解析失败: {}", e),
+            }
+        }
+    }
+    StackFile::write_index(&stack_lines, path).ok();
+}
+
+// 处理内存索引
+fn process_memory_index(files: &Vec<FileInfo>, path: &str) {
+    let gc_file: Vec<FileInfo> = files
+        .iter()
+        .filter(|f| f.file_type == FileType::Gc)
+        .cloned()
+        .collect();
+    // 处理两种情况：
+    let mut memory_infos = Vec::new();
+    let mut sorted_files: Vec<&FileInfo> = files.iter().filter(|f| f.time.is_some()).collect();
+    sorted_files.sort_by_key(|f| {
+        NaiveDateTime::parse_from_str(f.time.as_ref().unwrap(), "%Y-%m-%dT%H:%M:%S").unwrap()
+    });
+    // 提取排序后的前两个元素
+    let mut cycle = 0;
+    let mut start_time = None;
+    if let (Some(first), Some(second)) = (sorted_files.get(0), sorted_files.get(1)) {
+        let first_time =
+            NaiveDateTime::parse_from_str(first.time.as_ref().unwrap(), "%Y-%m-%dT%H:%M:%S")
+                .unwrap();
+        let second_time =
+            NaiveDateTime::parse_from_str(second.time.as_ref().unwrap(), "%Y-%m-%dT%H:%M:%S")
+                .unwrap();
+        // 计算时间差值
+        let time_difference: Duration = second_time - first_time;
+        cycle = time_difference.num_milliseconds();
+        start_time = Some(first_time);
+    }
+    for file in gc_file.iter() {
+        let path = Path::new(&file.path);
+        let parent = path.parent().unwrap();
+        if parent.to_str().unwrap().contains("gc") {
+            memory_infos = memory::batch_crate_memory_info(file.path.as_str(), start_time.unwrap(), cycle);
+        } else {
+            let memory_info = memory::create(&file.path);
+            memory_infos.push(memory_info.0);
+        }
+    }
+    let mut lines = Vec::new();
+    for info in memory_infos {
+        let line = to_string(&info).expect("解析gc信息错误");
+        lines.push(line);
+    }
+    MemoryFile::write_index(&lines, path).ok();
 }
 /**
  * 获取选中的路径类型，是文件夹还是压缩包

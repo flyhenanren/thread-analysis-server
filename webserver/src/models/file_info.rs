@@ -12,6 +12,11 @@ pub struct FileInfo {
     pub time: Option<String>,
 }
 
+lazy_static::lazy_static! {
+    static ref REGEX_TIME:Regex = Regex::new(r"(\d{8}_\d{6})").unwrap();
+}
+
+
 impl From<web::Json<FileInfo>> for FileInfo {
     fn from(info: web::Json<FileInfo>) -> Self {
         info.into_inner()
@@ -39,10 +44,8 @@ impl FileInfo {
     }
 
     fn extract_time_info(file_name: &str) -> Option<String> {
-        // 创建正则表达式来匹配日期和时间信息
-        let re = Regex::new(r"(\d{8}_\d{6})").unwrap();
         // 查找匹配项并提取时间信息
-        re.captures(file_name)
+        REGEX_TIME.captures(file_name)
             .and_then(|caps| caps.get(1))
             .map(|m| m.as_str().to_string())
     }
