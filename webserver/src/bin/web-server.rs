@@ -28,8 +28,7 @@ async fn main() -> io::Result<()> {
 
     // 初始化共享数据
     let shared_data = web::Data::new(AppState {
-        health_check_response: "I'm Ok.".to_string(),
-        visit_count: Mutex::new(0),
+        path: Mutex::new(String::new())
     });
 
     let app = move || {
