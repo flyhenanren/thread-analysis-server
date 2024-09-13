@@ -4,11 +4,12 @@ use std::fs::{self, File};
 use std::io::{self, BufRead, BufWriter, Error, Read, Write};
 use std::path::Path;
 
-use crate::models::cpu::{self, Cpu};
-use crate::models::file_info::FileType;
-use crate::models::memory::{self, MemoryInfo};
+use crate::error::AnalysisError;
+use crate::models::cpu::{Cpu};
+use crate::models::file_info::{DumpFile, FileType};
+use crate::models::memory::{self};
 use crate::models::thread::Thread;
-use crate::{files::file_index, files::zip_extract, models::file_info::FileInfo};
+use crate::{files::zip_extract, models::file_info::FileInfo};
 
 use super::file_index::{CpuFile, FileIndex, MemoryFile, SourceFile, StackFile};
 
@@ -53,6 +54,11 @@ pub fn analysis(path: &str) {
     if !exist_memory_idx {
         process_memory_index(&files, path);
     }
+}
+
+
+pub fn list_dump_file(path: &str) -> Result<Vec<DumpFile>, AnalysisError>{
+    Ok(vec![])
 }
 
 // 处理文件索引，读取或生成并写入索引文件

@@ -1,4 +1,5 @@
 use actix_web::web;
+use chrono::NaiveDateTime;
 use regex::Regex;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
@@ -78,5 +79,27 @@ impl FileType {
 impl From<web::Json<FileType>> for FileType{
     fn from(file_type: web::Json<FileType>) -> Self {
         file_type.into_inner()
+    }
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct DumpFile{
+    pub file_name: String,
+    pub time: NaiveDateTime,
+    pub run_threads: i32,
+    pub block_threads: i32,
+    pub threads: i32
+}
+
+
+impl From<web::Json<DumpFile>> for DumpFile {
+    fn from(dump_file: web::Json<DumpFile>) -> Self {
+        DumpFile {
+            file_name: dump_file.file_name.clone(),
+            time: dump_file.time.clone(),
+            run_threads: dump_file.run_threads,
+            block_threads: dump_file.block_threads,
+            threads: dump_file.threads
+        }
     }
 }

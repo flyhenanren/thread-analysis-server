@@ -1,13 +1,12 @@
 use actix_web::{web, HttpResponse};
-
-use crate::{files::file_analysis, state::AppState};
+use crate::{error::AnalysisError, files::file_analysis::{analysis, list_dump_file}, state::AppState};
 
 pub async fn load_file_handler(
     app_state: web::Data<AppState>,
     path: String
 ) -> HttpResponse {
     println!("path:{}", path);
-    file_analysis::analysis(&path);
+    analysis(&path);
     let mut state_path = app_state.path.lock().unwrap();
     *state_path = path;
     HttpResponse::Ok().json("OK")
@@ -15,7 +14,11 @@ pub async fn load_file_handler(
 
 pub async fn list_file_handler(
     app_state: web::Data<AppState>
-) -> HttpResponse {
+) -> Result<HttpResponse, AnalysisError> {
     let path = app_state.path.lock().unwrap();
-    HttpResponse::Ok().json(path.clone())
+    if path.clone().is_empty() {
+        return Ok(HttpResponse::Ok().json("请先选择需要解析的文件或文件夹"));
+    }
+    list_dump_file(&path.clone())
+    .map(|files| HttpResponse::Ok().json(files))
 }
