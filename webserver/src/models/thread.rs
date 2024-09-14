@@ -15,12 +15,12 @@ pub struct Thread {
     pub tid: u64,
     pub nid: u64,
     pub status: ThreadStatus,
-    pub address: String,
+    pub address: Option<String>,
     pub frames: Vec<CallFrame>,
 }
 lazy_static::lazy_static! {
     static ref REGEX_MAIN_INFO:Regex = Regex::new(
-        r#"^(?P<name>"[^"]*")(?: #(?P<number>\d+))?(?: prio=(?P<prio>\d+))?(?: os_prio=(?P<os_prio>\d+))? tid=(?P<tid>0x[0-9a-fA-F]+) nid=(?P<nid>0x[0-9a-fA-F]+) (?P<state>[^\[]*)(?:\[(?P<hex_address>0x[0-9a-fA-F]+)\])?$"#
+        r#"^(?P<name>".+?")(?: #(?P<number>\d+))?(?P<daemon> daemon)?(?: prio=(?P<prio>\d+))?(?: os_prio=(?P<os_prio>\d+))? tid=(?P<tid>0x[0-9a-fA-F]+) nid=(?P<nid>0x[0-9a-fA-F]+) (?P<state>[a-zA-Z\s.()]+)(?:\[(?P<hex_address>0x[0-9a-fA-F]+)\])?$"#
     ).unwrap();
     static ref REGEX_STATE:Regex = Regex::new(r"State:\s(\w+)").unwrap();
     static ref REGEX_FRAME:Regex = Regex::new(r"at\s+([\w.$]+)\.(<init>|[\w$]+(?:\$\$Lambda\$\d+/\d+)?)(?:\.(\w+))?\(([^:]+|Unknown Source)(?::(\d+))?\)").unwrap();
@@ -28,22 +28,28 @@ lazy_static::lazy_static! {
 
 impl Thread {
     pub fn new(lines: Vec<String>) -> Result<Self, ThreadError> {
-        let (name, id, daemon, prio, os_prio, tid, nid, address) =
+        let (name, id, daemon, prio, os_prio, tid, nid, state, address) =
             Self::parse_thread_info(&lines[0])?;
-        let status = match ThreadStatus::from_str(&lines[1]) {
-            Ok(status) => status,
-            Err(e) => {
-                return Err(ThreadError::ParseError(format!(
-                    "解析数据行:{}\r\n时错误。\r\nerror:{}",
-                    lines[1].to_string(),
-                    e.to_string()
-                )))
-            }
+
+        let status = match lines.len() == 1 {
+            true => ThreadStatus::parse(&state),
+            false => match ThreadStatus::from_str(&lines[1]) {
+                Ok(status) => status,
+                Err(e) => {
+                    return Err(ThreadError::ParseError(format!(
+                        "解析数据行:{}\r\n时错误。\r\nerror:{}",
+                        lines[1].to_string(),
+                        e.to_string()
+                    )))
+                }
+            },
         };
-        let call_info = &lines[2..=lines.len() - 1];
-        let mut frames: Vec<CallFrame> = Vec::with_capacity(call_info.len());
-        for call in call_info {
-            frames.push(CallFrame::new(&call)?);
+        let mut frames: Vec<CallFrame> = Vec::new();
+        if lines.len() > 1 {
+            let call_info = &lines[2..=lines.len() - 1];
+            for call in call_info {
+                frames.push(CallFrame::new(&call)?);
+            }    
         }
 
         Ok(Thread {
@@ -75,16 +81,29 @@ impl Thread {
 
     pub fn parse_thread_info(
         line: &str,
-    ) -> Result<(String, Option<String>, bool, Option<u16>, u32, u64, u64, String), ThreadError> {
+    ) -> Result<
+        (
+            String,
+            Option<String>,
+            bool,
+            Option<u16>,
+            u32,
+            u64,
+            u64,
+            String,
+            Option<String>,
+        ),
+        ThreadError,
+    > {
         if let Some(caps) = REGEX_MAIN_INFO.captures(line) {
             let name = caps
                 .name("name")
-                .ok_or(ThreadError::MissingField)?
+                .ok_or(ThreadError::MissingField("name".into()))?
                 .as_str()
                 .trim_matches('\"')
                 .to_string();
-             let id = match caps.name("number"){
-                Some(number)  => Some(format!("#{}", number.as_str())),
+            let id = match caps.name("number") {
+                Some(number) => Some(format!("#{}", number.as_str())),
                 None => None,
             };
             let daemon = caps.name("daemon").is_some();
@@ -106,24 +125,28 @@ impl Thread {
                 .transpose()?;
             let tid_str = caps
                 .name("tid")
-                .ok_or(ThreadError::MissingField)?
+                .ok_or(ThreadError::MissingField("tid".into()))?
                 .as_str()
                 .strip_prefix("0x")
                 .ok_or(ThreadError::InvalidStatus)?;
             let tid = u64::from_str_radix(tid_str, 16).map_err(ThreadError::ParseIntError)?;
             let nid_str = caps
                 .name("nid")
-                .ok_or(ThreadError::MissingField)?
+                .ok_or(ThreadError::MissingField("nid".into()))?
                 .as_str()
                 .strip_prefix("0x")
                 .ok_or(ThreadError::InvalidStatus)?;
             let nid = u64::from_str_radix(nid_str, 16).map_err(ThreadError::ParseIntError)?;
-
-            let hex_address = caps
-                .name("hex_address")
-                .ok_or(ThreadError::MissingField)?
+            let state = caps
+                .name("state")
+                .ok_or(ThreadError::MissingField("state".into()))?
                 .as_str()
                 .to_string();
+
+            let hex_address = match caps.name("hex_address") {
+                Some(address) => Some(address.as_str().into()),
+                None => None,
+            };
             Ok((
                 name,
                 id,
@@ -132,6 +155,7 @@ impl Thread {
                 os_prio.unwrap_or_default(),
                 tid,
                 nid,
+                state,
                 hex_address,
             ))
         } else {
@@ -151,6 +175,7 @@ pub enum ThreadStatus {
     TimedWaiting,
     Terminated,
     New,
+    Unknown,
 }
 
 impl FromStr for ThreadStatus {
@@ -164,10 +189,21 @@ impl FromStr for ThreadStatus {
                 "TIMED_WAITING" => Ok(ThreadStatus::TimedWaiting),
                 "RUNNABLE" => Ok(ThreadStatus::Runnable),
                 "TERMINATED" => Ok(ThreadStatus::Terminated),
-                _ => Err(ThreadError::IllegalStatus(captures[1].to_string())),
+                _ => Ok(ThreadStatus::Unknown),
             }
         } else {
             Err(ThreadError::IllegalStatus(status.to_owned()))
+        }
+    }
+}
+
+impl ThreadStatus {
+    pub fn parse(status: &str) -> ThreadStatus {
+        match status {
+            "sleeping" => ThreadStatus::TimedWaiting,
+            "waiting on condition " => ThreadStatus::Waiting,
+            "runnable " => ThreadStatus::Runnable,
+            _ => ThreadStatus::Unknown,
         }
     }
 }
@@ -234,7 +270,7 @@ impl CallFrame {
         Err(ThreadError::ParseError("分割失败".to_string()))
     }
 }
-#[derive(Serialize,Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum Frame {
     MethodCall,
     Lock {
@@ -297,7 +333,7 @@ fn extract_address(input: &str) -> u64 {
     }
     0x0000000000000000
 }
-#[derive(Serialize,Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum MonitorAction {
     WaitingToLock,
     WaitingOn,
@@ -350,7 +386,7 @@ pub mod tests {
             nid: 0x2f03,
             status: ThreadStatus::Runnable,
             frames,
-            address: "0x00007f3d80f21000".to_owned(),
+            address: Some("0x00007f3d80f21000".to_owned()),
             daemon: false,
         };
         assert_eq!(result.unwrap(), thread)
@@ -406,7 +442,7 @@ pub mod tests {
             status: ThreadStatus::Blocked,
             frames,
             daemon: false,
-            address: "0x00007f3d80f22000".to_owned(),
+            address: Some("0x00007f3d80f22000".to_owned()),
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -484,7 +520,7 @@ pub mod tests {
             status: ThreadStatus::Waiting,
             frames,
             daemon: false,
-            address: "0x00007f3d80f23000".to_owned(),
+            address: Some("0x00007f3d80f23000".to_owned()),
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -535,7 +571,7 @@ pub mod tests {
             status: ThreadStatus::TimedWaiting,
             frames,
             daemon: false,
-            address: "0x00007f3d80f24000".to_owned(),
+            address: Some("0x00007f3d80f24000".to_owned()),
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -612,7 +648,7 @@ pub mod tests {
             status: ThreadStatus::TimedWaiting,
             frames,
             daemon: false,
-            address: "0x00007f3d80f26000".to_owned(),
+            address: Some("0x00007f3d80f26000".to_owned()),
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -692,7 +728,7 @@ pub mod tests {
             status: ThreadStatus::TimedWaiting,
             frames,
             daemon: false,
-            address: "0x00007f3d80f27000".to_owned(),
+            address: Some("0x00007f3d80f27000".to_owned()),
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -772,11 +808,10 @@ pub mod tests {
             status: ThreadStatus::Waiting,
             frames,
             daemon: false,
-            address: "0x00007f3d80f25000".to_owned(),
+            address: Some("0x00007f3d80f25000".to_owned()),
         };
         assert_eq!(result.unwrap(), thread)
     }
-
 
     #[test]
     pub fn test_gc_thread() {
@@ -794,7 +829,7 @@ pub mod tests {
             nid: 0xec316,
             status: ThreadStatus::Runnable,
             frames,
-            address: "0x0000000000000000".to_owned(),
+            address: None,
             daemon: false,
         };
         assert_eq!(result.unwrap(), thread)
@@ -803,8 +838,8 @@ pub mod tests {
     #[test]
     pub fn test_vm_thread() {
         let lines = vec![
-          "\"VM Thread\" os_prio=0 tid=0x0000ffff8c132000 nid=0xec341 runnable ".to_string(),
-    ];
+            "\"VM Thread\" os_prio=0 tid=0x0000ffff8c132000 nid=0xec341 runnable ".to_string(),
+        ];
         let result = Thread::new(lines);
         let mut frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
@@ -816,7 +851,7 @@ pub mod tests {
             nid: 0xec341,
             status: ThreadStatus::Runnable,
             frames,
-            address: "0x0000000000000000".to_owned(),
+            address: None,
             daemon: false,
         };
         assert_eq!(result.unwrap(), thread)
@@ -838,8 +873,51 @@ pub mod tests {
             nid: 0xec358,
             status: ThreadStatus::Waiting,
             frames,
-            address: "0x0000000000000000".to_owned(),
+            address: None,
             daemon: false,
+        };
+        assert_eq!(result.unwrap(), thread)
+    }
+
+    #[test]
+    pub fn test_chinese_thread() {
+        let lines = vec![
+          "\"消息接收线程\" #206 prio=5 os_prio=0 tid=0x0000fffc052fa000 nid=0xed49b sleeping[0x0000fffea63fe000]".to_string(),
+    ];
+        let result = Thread::new(lines);
+        let mut frames: Vec<CallFrame> = Vec::new();
+        let thread = Thread {
+            id: Some("#206".into()),
+            name: "消息接收线程".to_string(),
+            prio: Some(5),
+            os_prio: 0,
+            tid: 0x0000fffc052fa000,
+            nid: 0xed49b,
+            status: ThreadStatus::TimedWaiting,
+            frames,
+            address: Some("0x0000fffea63fe000".to_owned()),
+            daemon: false,
+        };
+        assert_eq!(result.unwrap(), thread)
+    }
+    #[test]
+    pub fn test_sleeping_thread() {
+        let lines = vec![
+          "\"lettuce-timer-3-1\" #63 daemon prio=5 os_prio=0 tid=0x0000fffd7ac8e000 nid=0xec9e9 sleeping[0x0000ffff075fe000]".to_string(),
+    ];
+        let result = Thread::new(lines);
+        let mut frames: Vec<CallFrame> = Vec::new();
+        let thread = Thread {
+            id: Some("#63".into()),
+            name: "lettuce-timer-3-1".to_string(),
+            prio: Some(5),
+            os_prio: 0,
+            tid: 0x0000fffd7ac8e000,
+            nid: 0xec9e9,
+            status: ThreadStatus::TimedWaiting,
+            frames,
+            address: Some("0x0000ffff075fe000".to_owned()),
+            daemon: true,
         };
         assert_eq!(result.unwrap(), thread)
     }

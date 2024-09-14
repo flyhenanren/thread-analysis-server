@@ -82,8 +82,8 @@ impl From<web::Json<FileType>> for FileType{
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub struct DumpFile{
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ThreadsInfo{
     pub file_name: String,
     pub time: NaiveDateTime,
     pub run_threads: i32,
@@ -91,10 +91,29 @@ pub struct DumpFile{
     pub threads: i32
 }
 
+impl ThreadsInfo {
+    pub fn new(file_name: &str, time: &NaiveDateTime, threads: i32) -> Self {
+        ThreadsInfo {
+            file_name: file_name.into(),
+            time: time.clone(),
+            run_threads: 0,
+            block_threads: 0,
+            threads,
+        }
+    }
 
-impl From<web::Json<DumpFile>> for DumpFile {
-    fn from(dump_file: web::Json<DumpFile>) -> Self {
-        DumpFile {
+    pub fn increment_run(&mut self){
+        self.run_threads+=1;
+    }
+
+    pub fn increment_block(&mut self){
+        self.block_threads +=1;
+    }
+}
+
+impl From<web::Json<ThreadsInfo>> for ThreadsInfo {
+    fn from(dump_file: web::Json<ThreadsInfo>) -> Self {
+        ThreadsInfo {
             file_name: dump_file.file_name.clone(),
             time: dump_file.time.clone(),
             run_threads: dump_file.run_threads,

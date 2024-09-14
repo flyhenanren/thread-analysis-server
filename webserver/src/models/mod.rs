@@ -3,3 +3,4 @@ pub mod config;
 pub mod cpu;
 pub mod memory;
 pub mod thread;
+pub mod stack;

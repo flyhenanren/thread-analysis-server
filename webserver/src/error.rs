@@ -1,8 +1,8 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{fmt, num::ParseIntError};
 use actix_web::{error, http::StatusCode, HttpResponse, Result};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum AnalysisError{
   DBError(String),
   ActixError(String),
@@ -74,7 +74,7 @@ pub enum ThreadError{
   ParseError(String),
   RegexError(regex::Error),
   ParseIntError(ParseIntError),
-  MissingField,
+  MissingField(String),
   InvalidStatus,
 }
 
@@ -97,7 +97,7 @@ impl fmt::Display for ThreadError {
           ThreadError::ParseError(s) => write!(f, "Parse Error: {}", s),
           ThreadError::RegexError(e) => write!(f, "Regex Error:{}", e),
           ThreadError::ParseIntError(e) => write!(f, "ParseIntError:{}",e),
-          ThreadError::MissingField => write!(f, "MissingField"),
+          ThreadError::MissingField(e) => write!(f, "MissingField:{}",e),
           ThreadError::InvalidStatus => write!(f, "InvalidStatus"),
       }
   }

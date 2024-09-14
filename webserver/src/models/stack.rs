@@ -1,4 +1,4 @@
-use std::{collections::HashMap, usize};
+use std::{collections::HashMap};
 
 use crate::models::thread::{CallFrame, Frame, Thread};
 
@@ -68,11 +68,7 @@ pub mod tests {
         fs,
         io::{self, BufRead},
     };
-
     use chrono::Local;
-
-    use crate::models::thread::{self, ThreadStatus};
-
     use super::*;
 
     #[test]
