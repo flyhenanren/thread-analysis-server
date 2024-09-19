@@ -2,7 +2,6 @@ use chrono::{Duration, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use core::f64;
 use std::io::{BufRead, BufWriter, Error, Read, Write};
-use std::process::id;
 use std::{fs, io, path::Path};
 
 #[derive(Serialize,Deserialize,Debug, PartialEq)]
@@ -98,7 +97,7 @@ pub fn batch_crate_memory_info(
     let mut current_time = start;
     for line in reader.lines() {
         let line = line.unwrap();
-        if line.starts_with(S0C) {
+        if line.contains(S0C) {
             flag =true;
             continue;
         }

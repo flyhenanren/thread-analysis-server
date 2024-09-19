@@ -111,8 +111,13 @@ mod tests {
     }
 
     #[test]
-    fn test_walk_dir() {
+    fn test_walk_dir_all() {
         let path = Path::new("D:\\dump\\20240726");
+        analysis(path.as_str());
+    }
+    #[test]
+    fn test_walk_dir() {
+        let path = Path::new("D:\\dump\\20240809_1");
         analysis(path.as_str());
     }
 }

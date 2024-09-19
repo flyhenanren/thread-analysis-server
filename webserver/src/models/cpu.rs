@@ -4,17 +4,17 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize,Deserialize, Debug, PartialEq)]
 pub struct Cpu {
-    time: String,
-    us: f64,
-    sy: f64,
-    id: f64,
-    tasks: u32,
-    running: u32,
-    sleeping: u32,
-    mem_total: f64,
-    mem_free: f64,
-    mem_used: f64,
-    process: Vec<Process>,
+    pub time: String,
+    pub us: f64,
+    pub sy: f64,
+    pub id: f64,
+    pub tasks: u32,
+    pub running: u32,
+    pub sleeping: u32,
+    pub mem_total: f64,
+    pub mem_free: f64,
+    pub mem_used: f64,
+    pub process: Vec<Process>,
 }
 
 impl Cpu {

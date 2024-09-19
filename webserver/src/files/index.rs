@@ -1,7 +1,10 @@
 use chrono::{Duration, NaiveDateTime, Utc};
+use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
+use std::f32::consts::E;
 use std::fs;
 use std::io::{self, BufRead, BufReader, BufWriter, Error, ErrorKind, Read, Write};
+use std::ptr::null;
 use std::{fs::File, path::Path};
 
 use crate::common::utils;
@@ -14,37 +17,37 @@ pub trait FileIndex<T> {
     fn read_index(path: &str) -> std::io::Result<Vec<T>>;
     fn write_index(files: &Vec<FileInfo>, path: &str);
     fn exist_index(path: &str) -> bool;
+}
 
-    fn read(path: &str, file_name: &str) -> std::io::Result<Vec<String>> {
-        let target_path = Path::new(path).join(file_name);
-        if target_path.exists() {
-            let file = File::open(&target_path)?;
-            let reader = BufReader::new(file);
-            let mut lines = Vec::new();
-            for line in reader.lines() {
-                let line = line?;
-                lines.push(line);
-            }
-            return Ok(lines);
+fn read(path: &str, file_name: &str) -> std::io::Result<Vec<String>> {
+    let target_path = Path::new(path).join(file_name);
+    if target_path.exists() {
+        let file = File::open(&target_path)?;
+        let reader = BufReader::new(file);
+        let mut lines = Vec::new();
+        for line in reader.lines() {
+            let line = line?;
+            lines.push(line);
         }
-        Err(std::io::Error::new(ErrorKind::NotFound, "不存在索引文件"))
+        return Ok(lines);
     }
-    fn exist(path: &str, name: &str) -> bool {
-        let target_dir = Path::new(path).join(name);
-        target_dir.exists()
-    }
+    Err(std::io::Error::new(ErrorKind::NotFound, "不存在索引文件"))
+}
+fn exist(path: &str, name: &str) -> bool {
+    let target_dir = Path::new(path).join(name);
+    target_dir.exists()
+}
 
-    fn write(lines: &Vec<String>, path: &str, file_name: &str) -> std::io::Result<()> {
-        if !Self::exist(path, &file_name) {
-            let file = File::create(Path::new(path).join(file_name))?;
-            let mut writer = BufWriter::new(file);
-            for line in lines {
-                // 写入 JSON 字符串到文件，每行一个 JSON 对象
-                writeln!(writer, "{}", line)?;
-            }
+fn write(lines: &Vec<String>, path: &str, file_name: &str) -> std::io::Result<()> {
+    if !exist(path, &file_name) {
+        let file = File::create(Path::new(path).join(file_name))?;
+        let mut writer = BufWriter::new(file);
+        for line in lines {
+            // 写入 JSON 字符串到文件，每行一个 JSON 对象
+            writeln!(writer, "{}", line)?;
         }
-        Ok(())
     }
+    Ok(())
 }
 
 pub struct SourceIndex;
@@ -53,9 +56,15 @@ pub struct StackIndex;
 pub struct CpuIndex;
 pub struct MemoryIndex;
 
+#[derive(Serialize, Deserialize)]
+pub struct DumpInfo{
+    start_time: NaiveDateTime,
+    time_cycle: i64
+}
+
 impl FileIndex<FileInfo> for SourceIndex {
     fn read_index(path: &str) -> io::Result<Vec<FileInfo>> {
-        Self::read(path, "f_idx")?
+        read(path, "f_idx")?
             .into_iter()
             .map(|line| {
                 from_str::<FileInfo>(&line).map_err(|err| {
@@ -70,17 +79,17 @@ impl FileIndex<FileInfo> for SourceIndex {
             .iter()
             .map(|file| to_string(&file).expect(&format!("序列化错误：{:?}", file)))
             .collect();
-        let _ = Self::write(&lines, path, "f_idx");
+        let _ = write(&lines, path, "f_idx");
     }
 
     fn exist_index(path: &str) -> bool {
-        Self::exist(path, "f_idx")
+        exist(path, "f_idx")
     }
 }
 
 impl FileIndex<Cpu> for CpuIndex {
     fn read_index(path: &str) -> std::io::Result<Vec<Cpu>> {
-        Self::read(path, "cpu_idx")?
+        read(path, "cpu_idx")?
             .into_iter()
             .map(|line| {
                 from_str::<Cpu>(&line).map_err(|err| {
@@ -110,17 +119,17 @@ impl FileIndex<Cpu> for CpuIndex {
             let line = to_string(&cpu).expect("解析CPU信息错误");
             cpu_lines.push(line);
         }
-        Self::write(&cpu_lines, path, "cpu_idx");
+        write(&cpu_lines, path, "cpu_idx");
     }
 
     fn exist_index(path: &str) -> bool {
-        Self::exist(path, "cpu_idx")
+        exist(path, "cpu_idx")
     }
 }
 
 impl FileIndex<MemoryInfo> for MemoryIndex {
     fn read_index(path: &str) -> std::io::Result<Vec<MemoryInfo>> {
-        Self::read(path, "mem_idx")?
+        read(path, "mem_idx")?
         .into_iter()
         .map(|line| {
             from_str::<MemoryInfo>(&line).map_err(|err| {
@@ -137,32 +146,42 @@ impl FileIndex<MemoryInfo> for MemoryIndex {
             .cloned()
             .collect();
         // 处理两种情况：
+        // 提取排序后的前两个元素
+        let mut cycle: Option<i64> = None;
+        let mut start_time = None;
+        match read_dump(path) {
+            Ok(dump) => {
+                cycle = Some(dump.time_cycle);
+                start_time = Some(dump.start_time);
+            },
+            Err(err) => println!("未取得dump信息"),
+        }
         let mut memory_infos = Vec::new();
         let mut sorted_files: Vec<&FileInfo> = gc_file.iter().filter(|f| f.time.is_some()).collect();
-        sorted_files.sort_by_key(|f| {
-            NaiveDateTime::parse_from_str(f.time.as_ref().unwrap(), "%Y-%m-%dT%H:%M:%S").unwrap()
-        });
-        // 提取排序后的前两个元素
-        let mut cycle = 0;
-        let mut start_time = None;
-        if let (Some(first), Some(second)) = (sorted_files.get(0), sorted_files.get(1)) {
-            let first_time =
-                NaiveDateTime::parse_from_str(first.time.as_ref().unwrap(), "%Y-%m-%dT%H:%M:%S")
-                    .unwrap();
-            let second_time =
-                NaiveDateTime::parse_from_str(second.time.as_ref().unwrap(), "%Y-%m-%dT%H:%M:%S")
-                    .unwrap();
-            // 计算时间差值
-            let time_difference: Duration = second_time - first_time;
-            cycle = time_difference.num_milliseconds();
-            start_time = Some(first_time);
+        if sorted_files.len() > 1 && start_time.is_none() && cycle.is_none(){
+            sorted_files.sort_by_key(|f| {
+                NaiveDateTime::parse_from_str(f.time.as_ref().unwrap(), "%Y-%m-%dT%H:%M:%S").unwrap()
+            });
+            if let (Some(first), Some(second)) = (sorted_files.get(0), sorted_files.get(1)) {
+                let first_time =
+                    NaiveDateTime::parse_from_str(first.time.as_ref().unwrap(), "%Y-%m-%dT%H:%M:%S")
+                        .unwrap();
+                let second_time =
+                    NaiveDateTime::parse_from_str(second.time.as_ref().unwrap(), "%Y-%m-%dT%H:%M:%S")
+                        .unwrap();
+                // 计算时间差值
+                let time_difference: Duration = second_time - first_time;
+                cycle = Some(time_difference.num_seconds());
+                start_time = Some(first_time);
+            }
         }
+
         for file in gc_file.iter() {
             let path = Path::new(&file.path);
             let parent = path.parent().unwrap();
             if parent.to_str().unwrap().contains("gc") {
                 memory_infos =
-                    memory::batch_crate_memory_info(file.path.as_str(), start_time.unwrap(), cycle);
+                    memory::batch_crate_memory_info(file.path.as_str(), start_time.unwrap(), cycle.unwrap());
             } else {
                 let memory_info = memory::create(&file.path);
                 memory_infos.push(memory_info.0);
@@ -173,17 +192,17 @@ impl FileIndex<MemoryInfo> for MemoryIndex {
             let line = to_string(&info).expect("解析gc信息错误");
             lines.push(line);
         }
-        let _ = Self::write(&lines, path, "mem_idx");
+        let _ = write(&lines, path, "mem_idx");
     }
 
     fn exist_index(path: &str) -> bool {
-        Self::exist(path, "mem_idx")
+        exist(path, "mem_idx")
     }
 }
 
 impl FileIndex<ThreadsInfo> for ThreadsIndex {
     fn read_index(path: &str) -> io::Result<Vec<ThreadsInfo>> {
-        Self::read(path, "stack_idx")?
+        read(path, "stack_idx")?
             .into_iter()
             .map(|line| {
                 from_str::<ThreadsInfo>(&line).map_err(|err| {
@@ -201,6 +220,10 @@ impl FileIndex<ThreadsInfo> for ThreadsIndex {
             .collect();
         let mut stack_lines = Vec::with_capacity(stack_file.len());
         let mut thread_file_lines = Vec::with_capacity(stack_file.len());
+        
+        let mut start_time: Option<NaiveDateTime> = None;
+        let mut time_cycle: Option<i64> = None;
+
         for file in stack_file {
             let path = Path::new(&file.path);
             let file = fs::File::open(path).unwrap();
@@ -213,22 +236,27 @@ impl FileIndex<ThreadsInfo> for ThreadsIndex {
             let mut thread_lines: Vec<Vec<String>> = Vec::new();
             let mut current_group: Vec<String> = Vec::new();
             let mut start = false;
-            let mut read_time = false;
-            let mut time: NaiveDateTime =  Utc::now().naive_utc();
+            let mut time: Option<NaiveDateTime> = None;
             for line in reader.lines() {
                 match line {
-                    Ok(l) => {
-                        if l.is_empty() {
+                    Ok(line) => {
+                        if line.is_empty() {
                             start = false;
                             continue;
                         }
-                        if !read_time {
-                            if utils::is_valid_datetime(&l) {
-                                time = utils::parse_time(&l).unwrap();
-                                read_time = true;
+                        if time.is_none() {
+                            if utils::is_valid_datetime(&line) {
+                                let parsed_time = utils::parse_time(&line).unwrap();
+                                time = Some(parsed_time);
+                                if start_time.is_none() {
+                                    start_time = Some(parsed_time);
+                                }else if time_cycle.is_none() {
+                                    let time_difference: Duration = parsed_time - start_time.unwrap();
+                                    time_cycle = Some(time_difference.num_seconds());
+                                }
                             }
                         }
-                        if l.contains("nid=") {
+                        if line.contains("nid=") {
                             start = true;
                             if !current_group.is_empty() {
                                 thread_lines.push(current_group);
@@ -236,7 +264,7 @@ impl FileIndex<ThreadsInfo> for ThreadsIndex {
                             }
                         }
                         if start {
-                            current_group.push(l);
+                            current_group.push(line);
                         }
                     }
                     Err(_) => {}
@@ -246,8 +274,7 @@ impl FileIndex<ThreadsInfo> for ThreadsIndex {
                 thread_lines.push(current_group);
             }
 
-            let mut thread_info = ThreadsInfo::new(file_name, &time, thread_lines.len() as i32);
-
+            let mut thread_info = ThreadsInfo::new(file_name, &time.unwrap(), thread_lines.len() as i32);
             for group in thread_lines {
                 match Thread::new(group) {
                     Ok(thread) => {
@@ -264,10 +291,35 @@ impl FileIndex<ThreadsInfo> for ThreadsIndex {
             }
             thread_file_lines.push(to_string(&thread_info).expect("msg"));
         }
-        let _ =Self::write(&thread_file_lines, path, "thread_idx");
+        let dump_info = DumpInfo{
+            start_time: start_time.unwrap(),
+            time_cycle: time_cycle.unwrap(),
+        };
+        let _ =write(&thread_file_lines, path, "thread_idx");
+        write_dump(dump_info, path);
     }
 
     fn exist_index(path: &str) -> bool {
-        Self::exist(path, "thread_idx")
+        exist(path, "thread_idx")
     }
+}
+
+
+fn write_dump(dump_info: DumpInfo, path: &str){
+    let _ =write(&vec![to_string(&dump_info).expect("msg")], path, "dump_idx");
+}
+
+fn read_dump(path: &str) -> io::Result<DumpInfo> {
+    read(path, "dump_idx")?
+    .into_iter()
+        .find_map(|line| {
+            match from_str::<DumpInfo>(&line) {
+                Ok(info) => Some(Ok(info)),  // 返回解析成功的 DumpInfo
+                Err(_) => None,  // 如果解析失败，则返回 None，继续查找下一个
+            }
+        })
+        .unwrap_or_else(|| {
+            // 如果没有成功解析的条目，返回错误
+            Err(io::Error::new(io::ErrorKind::InvalidData, "无法解析任何有效的 DumpInfo"))
+        })
 }
