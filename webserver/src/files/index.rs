@@ -226,10 +226,7 @@ impl FileIndex<ThreadsInfo, FileInfo> for ThreadsIndex {
         for file in stack_file {
             let path = Path::new(&file.path);
             let file = fs::File::open(path).unwrap();
-            let file_name = Path::new(path)
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or("无法获取文件名");
+          
 
             let reader = io::BufReader::new(file);
             let mut thread_lines: Vec<Vec<String>> = Vec::new();
@@ -273,7 +270,7 @@ impl FileIndex<ThreadsInfo, FileInfo> for ThreadsIndex {
                 thread_lines.push(current_group);
             }
 
-            let mut thread_info = ThreadsInfo::new(file_name, &time.unwrap(), thread_lines.len() as i32);
+            let mut thread_info = ThreadsInfo::new(path.to_str().expect("Invalid Path"), &time.unwrap(), thread_lines.len() as i32);
             thread_info.set_start_line(stack_line_number);
             for group in thread_lines {
                 match Thread::new(group) {

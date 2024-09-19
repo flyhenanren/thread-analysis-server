@@ -1,4 +1,4 @@
-use crate::handlers::{general::*, file::*};
+use crate::handlers::{general::*, file::*, stack::*};
 use actix_web::web;
 
 
@@ -15,5 +15,10 @@ pub fn file_routes(cfg: &mut web::ServiceConfig) {
             // .route("/{teacher_id}/{course_id}", web::get().to(get_course_detail))
             // .route("/{teacher_id}/{course_id}", web::delete().to(delete_course))
             // .route("/{teacher_id}/{course_id}", web::put().to(update_coruse_detail)),
+    )
+    .service(
+        web::scope("/stack")
+            .route("/query", web::post().to(query_stack))
+            
     );
 }
