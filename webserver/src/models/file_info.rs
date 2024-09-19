@@ -1,12 +1,14 @@
 use actix_web::web;
 use chrono::NaiveDateTime;
 use regex::Regex;
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 use crate::models::config::EnvVars;
 
-#[derive(Serialize,Deserialize, Debug, Clone, PartialEq)]
+use super::thread::Thread;
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct FileInfo {
     pub path: String,
     pub file_type: FileType,
@@ -16,7 +18,6 @@ pub struct FileInfo {
 lazy_static::lazy_static! {
     static ref REGEX_TIME:Regex = Regex::new(r"(\d{8}_\d{6})").unwrap();
 }
-
 
 impl From<web::Json<FileInfo>> for FileInfo {
     fn from(info: web::Json<FileInfo>) -> Self {
@@ -46,7 +47,8 @@ impl FileInfo {
 
     fn extract_time_info(file_name: &str) -> Option<String> {
         // 查找匹配项并提取时间信息
-        REGEX_TIME.captures(file_name)
+        REGEX_TIME
+            .captures(file_name)
             .and_then(|caps| caps.get(1))
             .map(|m| m.as_str().to_string())
     }
@@ -75,20 +77,22 @@ impl FileType {
     }
 }
 
-
-impl From<web::Json<FileType>> for FileType{
+impl From<web::Json<FileType>> for FileType {
     fn from(file_type: web::Json<FileType>) -> Self {
         file_type.into_inner()
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ThreadsInfo{
+pub struct ThreadsInfo {
     pub file_name: String,
     pub time: NaiveDateTime,
     pub run_threads: i32,
     pub block_threads: i32,
-    pub threads: i32
+    pub threads: i32,
+    pub start_line: i128,
+    pub end_line: i128,
+
 }
 
 impl ThreadsInfo {
@@ -99,15 +103,23 @@ impl ThreadsInfo {
             run_threads: 0,
             block_threads: 0,
             threads,
+            start_line:0,
+            end_line:0
         }
     }
 
-    pub fn increment_run(&mut self){
-        self.run_threads+=1;
+    pub fn increment_run(&mut self) {
+        self.run_threads += 1;
     }
 
-    pub fn increment_block(&mut self){
-        self.block_threads +=1;
+    pub fn increment_block(&mut self) {
+        self.block_threads += 1;
+    }
+    pub fn set_start_line(&mut self, line: i128){
+        self.start_line = line;
+    }
+    pub fn set_end_line(&mut self, line: i128){
+        self.end_line = line;
     }
 }
 
@@ -118,7 +130,15 @@ impl From<web::Json<ThreadsInfo>> for ThreadsInfo {
             time: dump_file.time.clone(),
             run_threads: dump_file.run_threads,
             block_threads: dump_file.block_threads,
-            threads: dump_file.threads
+            threads: dump_file.threads,
+            start_line: dump_file.start_line,
+            end_line: dump_file.end_line
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StackInfo {
+    pub file_name: String,
+    pub threads: Vec<Thread>,
 }

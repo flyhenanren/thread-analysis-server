@@ -1,21 +1,19 @@
 use chrono::{Duration, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
-use std::f32::consts::E;
 use std::fs;
 use std::io::{self, BufRead, BufReader, BufWriter, Error, ErrorKind, Read, Write};
-use std::ptr::null;
 use std::{fs::File, path::Path};
 
 use crate::common::utils;
 use crate::models::cpu::Cpu;
-use crate::models::file_info::{FileInfo, FileType, ThreadsInfo};
+use crate::models::file_info::{FileInfo, FileType, StackInfo, ThreadsInfo};
 use crate::models::memory::{self, MemoryInfo};
 use crate::models::thread::{Thread, ThreadStatus};
 
-pub trait FileIndex<T> {
+pub trait FileIndex<T, U> {
     fn read_index(path: &str) -> std::io::Result<Vec<T>>;
-    fn write_index(files: &Vec<FileInfo>, path: &str);
+    fn write_index(files: &Vec<U>, path: &str);
     fn exist_index(path: &str) -> bool;
 }
 
@@ -62,7 +60,7 @@ pub struct DumpInfo{
     time_cycle: i64
 }
 
-impl FileIndex<FileInfo> for SourceIndex {
+impl FileIndex<FileInfo, FileInfo> for SourceIndex {
     fn read_index(path: &str) -> io::Result<Vec<FileInfo>> {
         read(path, "f_idx")?
             .into_iter()
@@ -87,7 +85,7 @@ impl FileIndex<FileInfo> for SourceIndex {
     }
 }
 
-impl FileIndex<Cpu> for CpuIndex {
+impl FileIndex<Cpu, FileInfo> for CpuIndex {
     fn read_index(path: &str) -> std::io::Result<Vec<Cpu>> {
         read(path, "cpu_idx")?
             .into_iter()
@@ -127,7 +125,7 @@ impl FileIndex<Cpu> for CpuIndex {
     }
 }
 
-impl FileIndex<MemoryInfo> for MemoryIndex {
+impl FileIndex<MemoryInfo, FileInfo> for MemoryIndex {
     fn read_index(path: &str) -> std::io::Result<Vec<MemoryInfo>> {
         read(path, "mem_idx")?
         .into_iter()
@@ -200,9 +198,9 @@ impl FileIndex<MemoryInfo> for MemoryIndex {
     }
 }
 
-impl FileIndex<ThreadsInfo> for ThreadsIndex {
+impl FileIndex<ThreadsInfo, FileInfo> for ThreadsIndex {
     fn read_index(path: &str) -> io::Result<Vec<ThreadsInfo>> {
-        read(path, "stack_idx")?
+        read(path, "thread_idx")?
             .into_iter()
             .map(|line| {
                 from_str::<ThreadsInfo>(&line).map_err(|err| {
@@ -223,6 +221,7 @@ impl FileIndex<ThreadsInfo> for ThreadsIndex {
         
         let mut start_time: Option<NaiveDateTime> = None;
         let mut time_cycle: Option<i64> = None;
+        let mut stack_line_number: i128 = 1;
 
         for file in stack_file {
             let path = Path::new(&file.path);
@@ -275,6 +274,7 @@ impl FileIndex<ThreadsInfo> for ThreadsIndex {
             }
 
             let mut thread_info = ThreadsInfo::new(file_name, &time.unwrap(), thread_lines.len() as i32);
+            thread_info.set_start_line(stack_line_number);
             for group in thread_lines {
                 match Thread::new(group) {
                     Ok(thread) => {
@@ -285,10 +285,12 @@ impl FileIndex<ThreadsInfo> for ThreadsIndex {
                         } else if thread.status == ThreadStatus::Runnable {
                             thread_info.increment_run();
                         }
+                        stack_line_number += 1;
                     }
                     Err(e) => println!("解析失败: {}", e),
                 }
             }
+            thread_info.set_end_line(stack_line_number - 1);
             thread_file_lines.push(to_string(&thread_info).expect("msg"));
         }
         let dump_info = DumpInfo{
@@ -296,6 +298,9 @@ impl FileIndex<ThreadsInfo> for ThreadsIndex {
             time_cycle: time_cycle.unwrap(),
         };
         let _ =write(&thread_file_lines, path, "thread_idx");
+        if !StackIndex::exist_index(path) {
+            StackIndex::write_index(&stack_lines, path);
+        }
         write_dump(dump_info, path);
     }
 
@@ -304,6 +309,27 @@ impl FileIndex<ThreadsInfo> for ThreadsIndex {
     }
 }
 
+
+impl FileIndex<StackInfo, String> for StackIndex {
+    fn read_index(path: &str) -> std::io::Result<Vec<StackInfo>> {
+        read(path, "stack_idx")?
+        .into_iter()
+        .map(|line| {
+            from_str::<StackInfo>(&line).map_err(|err| {
+                io::Error::new(io::ErrorKind::InvalidData, format!("无法解析:{}", &line))
+            })
+        })
+        .collect()
+    }
+
+    fn write_index(files: &Vec<String>, path: &str) {
+        write(files, path, "stack_idx");
+    }
+
+    fn exist_index(path: &str) -> bool {
+        exist(path, "stack_idx")
+    }
+}
 
 fn write_dump(dump_info: DumpInfo, path: &str){
     let _ =write(&vec![to_string(&dump_info).expect("msg")], path, "dump_idx");
