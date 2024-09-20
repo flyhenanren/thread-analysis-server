@@ -17,6 +17,9 @@ mod error;
 #[path = "../common/mod.rs"]
 mod common;
 
+#[path = "../service/mod.rs"]
+mod service;
+
 use routers::*;
 use state::AppState;
 
@@ -29,7 +32,7 @@ async fn main() -> io::Result<()> {
 
     // 初始化共享数据
     let shared_data = web::Data::new(AppState {
-        path: Mutex::new(String::new())
+        path: Mutex::new("D:\\dump\\20240726".to_string())
     });
 
     let app = move || {

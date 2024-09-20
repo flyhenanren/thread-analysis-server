@@ -1,12 +1,9 @@
 use actix_web::web;
-use chrono::NaiveDateTime;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use crate::models::config::EnvVars;
-
-use super::thread::Thread;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct FileInfo {
@@ -81,64 +78,4 @@ impl From<web::Json<FileType>> for FileType {
     fn from(file_type: web::Json<FileType>) -> Self {
         file_type.into_inner()
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ThreadsInfo {
-    pub file_name: String,
-    pub time: NaiveDateTime,
-    pub run_threads: i32,
-    pub block_threads: i32,
-    pub threads: i32,
-    pub start_line: i128,
-    pub end_line: i128,
-
-}
-
-impl ThreadsInfo {
-    pub fn new(file_name: &str, time: &NaiveDateTime, threads: i32) -> Self {
-        ThreadsInfo {
-            file_name: file_name.into(),
-            time: time.clone(),
-            run_threads: 0,
-            block_threads: 0,
-            threads,
-            start_line:0,
-            end_line:0
-        }
-    }
-
-    pub fn increment_run(&mut self) {
-        self.run_threads += 1;
-    }
-
-    pub fn increment_block(&mut self) {
-        self.block_threads += 1;
-    }
-    pub fn set_start_line(&mut self, line: i128){
-        self.start_line = line;
-    }
-    pub fn set_end_line(&mut self, line: i128){
-        self.end_line = line;
-    }
-}
-
-impl From<web::Json<ThreadsInfo>> for ThreadsInfo {
-    fn from(dump_file: web::Json<ThreadsInfo>) -> Self {
-        ThreadsInfo {
-            file_name: dump_file.file_name.clone(),
-            time: dump_file.time.clone(),
-            run_threads: dump_file.run_threads,
-            block_threads: dump_file.block_threads,
-            threads: dump_file.threads,
-            start_line: dump_file.start_line,
-            end_line: dump_file.end_line
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct StackInfo {
-    pub file_name: String,
-    pub threads: Vec<Thread>,
 }

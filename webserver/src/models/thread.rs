@@ -1,5 +1,6 @@
 use std::str::FromStr;
-
+use actix_web::web;
+use chrono::NaiveDateTime;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -167,7 +168,7 @@ impl Thread {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug,Clone, PartialEq)]
 pub enum ThreadStatus {
     Runnable,
     Blocked,
@@ -338,6 +339,102 @@ pub enum MonitorAction {
     WaitingToLock,
     WaitingOn,
     Locked,
+}
+
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ThreadsInfo {
+    pub file_name: String,
+    pub time: NaiveDateTime,
+    pub run_threads: i32,
+    pub block_threads: i32,
+    pub threads: i32,
+    pub start_line: i64,
+    pub end_line: i64,
+}
+
+impl ThreadsInfo {
+    pub fn new(file_name: &str, time: &NaiveDateTime, threads: i32) -> Self {
+        ThreadsInfo {
+            file_name: file_name.into(),
+            time: time.clone(),
+            run_threads: 0,
+            block_threads: 0,
+            threads,
+            start_line:0,
+            end_line:0
+        }
+    }
+
+    pub fn increment_run(&mut self) {
+        self.run_threads += 1;
+    }
+
+    pub fn increment_block(&mut self) {
+        self.block_threads += 1;
+    }
+    pub fn set_start_line(&mut self, line: i64){
+        self.start_line = line;
+    }
+    pub fn set_end_line(&mut self, line: i64){
+        self.end_line = line;
+    }
+}
+
+impl From<web::Json<ThreadsInfo>> for ThreadsInfo {
+    fn from(dump_file: web::Json<ThreadsInfo>) -> Self {
+        ThreadsInfo {
+            file_name: dump_file.file_name.clone(),
+            time: dump_file.time.clone(),
+            run_threads: dump_file.run_threads,
+            block_threads: dump_file.block_threads,
+            threads: dump_file.threads,
+            start_line: dump_file.start_line,
+            end_line: dump_file.end_line
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ThreadCount{
+    pub thread_name: String,
+    pub runnable: usize,
+    pub waitting: usize,
+    pub time_watting: usize,
+    pub block: usize,
+}
+
+impl From<web::Json<ThreadCount>> for ThreadCount {
+    fn from(thread_count: web::Json<ThreadCount>) -> Self {
+        ThreadCount {
+            thread_name: thread_count.thread_name.clone(),
+            runnable: thread_count.runnable,
+            waitting: thread_count.waitting,
+            time_watting: thread_count.time_watting,
+            block: thread_count.block,
+        }
+    }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ThreadCountQuery{
+    pub start: usize,
+    pub end: usize,
+    pub total: usize,
+    pub exclude: Option<Vec<String>>,
+    pub status: Option<Vec<ThreadStatus>>
+}
+
+impl From<web::Json<ThreadCountQuery>> for ThreadCountQuery {
+    fn from(count_query: web::Json<ThreadCountQuery>) -> Self {
+        ThreadCountQuery {
+            start: count_query.start,
+            end: count_query.end,
+            total: count_query.total,
+            exclude: count_query.exclude.clone(),
+            status: count_query.status.clone(),
+        }
+    }
 }
 
 #[cfg(test)]
