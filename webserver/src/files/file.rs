@@ -3,7 +3,7 @@ use std::io::{self, BufRead, BufWriter, Error, Read, Write};
 use std::path::Path;
 
 use crate::error::AnalysisError;
-use crate::models::thread::ThreadsInfo;
+use crate::models::thread::{ThreadsInfo};
 use crate::{models::file_info::FileInfo};
 use crate::common::file_utils::*;
 use super::index::{CpuIndex, FileIndex, MemoryIndex, SourceIndex, ThreadsIndex};

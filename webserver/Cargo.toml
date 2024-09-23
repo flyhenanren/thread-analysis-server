@@ -22,5 +22,9 @@ walkdir = "2.5.0"
 regex = "1"
 
 lazy_static = "1.4"
+
+
+# 数据库配置
+sqlx = {version= "0.8.2", features=["runtime-tokio","tls-rustls","sqlite","time","chrono"]}
 [[bin]]
 name="web-server"

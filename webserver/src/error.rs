@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{fmt, num::ParseIntError};
 use actix_web::{error, http::StatusCode, HttpResponse, Result};
+use sqlx::error::Error as SQLxError;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum AnalysisError{
@@ -57,6 +58,12 @@ impl fmt::Display for AnalysisError{
 impl From<actix_web::error::Error> for AnalysisError{
   fn from(value: actix_web::error::Error) -> Self {
     AnalysisError::ActixError(value.to_string())
+  }
+}
+
+impl From<SQLxError> for AnalysisError {
+  fn from(value: SQLxError) -> Self {
+    AnalysisError::DBError(value.to_string())
   }
 }
 

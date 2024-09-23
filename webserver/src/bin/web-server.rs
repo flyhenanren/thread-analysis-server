@@ -1,6 +1,8 @@
 use actix_web::{web, App, HttpServer};
+use db::db::*;
 use std::io;
 use std::sync::Mutex;
+use dotenv::dotenv;
 
 #[path = "../handlers/mod.rs"]
 mod handlers;
@@ -20,19 +22,23 @@ mod common;
 #[path = "../service/mod.rs"]
 mod service;
 
+#[path = "../db/mod.rs"]
+mod db;
+
 use routers::*;
 use state::AppState;
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
-    // dotenv().ok();
+    dotenv().ok();
     // let _url = env::var("DATABASE_URL").expect("找不到环境变量中的信息");
-
+    let pool: sqlx::Pool<sqlx::Sqlite> = establish_connection().await;
     // 引入数据库
 
     // 初始化共享数据
     let shared_data = web::Data::new(AppState {
-        path: Mutex::new("D:\\dump\\20240726".to_string())
+        path: Mutex::new("D:\\dump\\20240726".to_string()),
+        pool
     });
 
     let app = move || {

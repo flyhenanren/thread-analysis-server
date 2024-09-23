@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use crate::{error::AnalysisError, files::*, models::thread::ThreadCountQuery, service::thread_dump, state::AppState};
+use crate::{error::AnalysisError, files::*, models::thread::StatusQuery, service::thread_dump, state::AppState};
 use actix_web::{web, HttpResponse};
 
 pub async fn list_dump_handler(
@@ -30,15 +28,26 @@ pub async fn query_stack(
         .map_err(|err| AnalysisError::DBError(format!("对象转换错误:{}", err)))
 }
 
-pub async fn count_thread(
+pub async fn count_dumps_info(
     app_state: web::Data<AppState>,
-    count_query: web::Json<ThreadCountQuery>
+    count_query: web::Json<StatusQuery>
 ) -> Result<HttpResponse, AnalysisError> {
     let path = app_state.path.lock().unwrap();
     if path.clone().is_empty() {
         return Ok(HttpResponse::Ok().json("请先选择需要解析的文件或文件夹"));
     }
-    thread_dump::count_thread_info(&path.clone(), &count_query)
+    thread_dump::count_dumps_info(&path.clone(), &count_query)
     .map(|thread_count|  HttpResponse::Ok().json(thread_count))
     .map_err(|err|  AnalysisError::DBError(format!("对象转换错误:{}", err)))
+}
+
+pub async fn count_threads_status(app_state: web::Data<AppState>,
+    count_query: web::Json<StatusQuery>) -> Result<HttpResponse, AnalysisError> {
+        let path = app_state.path.lock().unwrap();
+        if path.clone().is_empty() {
+            return Ok(HttpResponse::Ok().json("请先选择需要解析的文件或文件夹"));
+        }
+        thread_dump::count_threads_info(&path.clone(), &count_query)
+        .map(|thread_count|  HttpResponse::Ok().json(thread_count))
+        .map_err(|err|  AnalysisError::DBError(format!("对象转换错误:{}", err)))
 }

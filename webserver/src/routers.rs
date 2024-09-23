@@ -1,4 +1,4 @@
-use crate::handlers::{general::*, file::*, thread::*};
+use crate::{db::db_stack::*, handlers::{file::*, general::*, thread::*}};
 use actix_web::web;
 
 
@@ -19,7 +19,8 @@ pub fn file_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/dump")
             .route("/list", web::get().to(list_dump_handler))
             .route("/query", web::post().to(query_stack))
-            .route("/count_thread", web::post().to(count_thread))
+            .route("/count_dump", web::post().to(count_dumps_info))
+            .route("/count_threads", web::post().to(count_threads_status))
             
     );
 }

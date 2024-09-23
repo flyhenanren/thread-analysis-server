@@ -362,7 +362,7 @@ impl ThreadsInfo {
             block_threads: 0,
             threads,
             start_line:0,
-            end_line:0
+            end_line:0,
         }
     }
 
@@ -390,24 +390,24 @@ impl From<web::Json<ThreadsInfo>> for ThreadsInfo {
             block_threads: dump_file.block_threads,
             threads: dump_file.threads,
             start_line: dump_file.start_line,
-            end_line: dump_file.end_line
+            end_line: dump_file.end_line,
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ThreadCount{
-    pub thread_name: String,
+pub struct StatusCount{
+    pub name: String,
     pub runnable: usize,
     pub waitting: usize,
     pub time_watting: usize,
     pub block: usize,
 }
 
-impl From<web::Json<ThreadCount>> for ThreadCount {
-    fn from(thread_count: web::Json<ThreadCount>) -> Self {
-        ThreadCount {
-            thread_name: thread_count.thread_name.clone(),
+impl From<web::Json<StatusCount>> for StatusCount {
+    fn from(thread_count: web::Json<StatusCount>) -> Self {
+        StatusCount {
+            name: thread_count.name.clone(),
             runnable: thread_count.runnable,
             waitting: thread_count.waitting,
             time_watting: thread_count.time_watting,
@@ -417,25 +417,24 @@ impl From<web::Json<ThreadCount>> for ThreadCount {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct ThreadCountQuery{
-    pub start: usize,
-    pub end: usize,
-    pub total: usize,
+pub struct StatusQuery{
+    pub files: Vec<String>,
+    pub total: Option<usize>,
     pub exclude: Option<Vec<String>>,
     pub status: Option<Vec<ThreadStatus>>
 }
 
-impl From<web::Json<ThreadCountQuery>> for ThreadCountQuery {
-    fn from(count_query: web::Json<ThreadCountQuery>) -> Self {
-        ThreadCountQuery {
-            start: count_query.start,
-            end: count_query.end,
+impl From<web::Json<StatusQuery>> for StatusQuery {
+    fn from(count_query: web::Json<StatusQuery>) -> Self {
+        StatusQuery {
+            files: count_query.files.clone(),
             total: count_query.total,
             exclude: count_query.exclude.clone(),
             status: count_query.status.clone(),
         }
     }
 }
+
 
 #[cfg(test)]
 pub mod tests {
