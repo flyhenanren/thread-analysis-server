@@ -1,44 +1,49 @@
 use std::str::FromStr;
 
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize,Deserialize, Debug, PartialEq)]
+use crate::common::utils;
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Cpu {
-    pub time: String,
+    pub file_id: String,
+    pub work_space: String,
+    pub exe_time: NaiveDateTime,
     pub us: f64,
     pub sy: f64,
-    pub id: f64,
+    pub ids: f64,
     pub tasks: u32,
     pub running: u32,
     pub sleeping: u32,
     pub mem_total: f64,
     pub mem_free: f64,
     pub mem_used: f64,
-    pub process: Vec<Process>,
 }
 
 impl Cpu {
-    pub fn new(lines: Vec<String>) -> Self {
+    pub fn new(lines: Vec<String>, file_id: &str, work_space: &str) -> Self {
         let time = Self::extract_main(lines.get(0).unwrap());
         let (tasks, running, sleeping) = Self::extract_threads(lines.get(1).unwrap());
         let (us, sy, id) = Self::extract_cpu(lines.get(2).unwrap());
         let (mem_total, mem_free, mem_used) = Self::extract_mem(lines.get(3).unwrap());
-        let process:Vec<Process> = Vec::with_capacity(0);
+        // let process: Vec<Process> = Vec::with_capacity(0);
         // for i in 7..lines.len() {
         //     process.push(Process::from_str(&lines[i]).unwrap());
         // }
         Cpu {
-            time,
+            file_id: file_id.into(),
+            work_space: work_space.into(),
+            exe_time: utils::parse_time(&time).unwrap(),
             us,
             sy,
-            id,
+            ids:id,
             tasks,
             running,
             sleeping,
             mem_total,
             mem_free,
             mem_used,
-            process,
         }
     }
     fn extract_main(line: &str) -> String {
@@ -122,7 +127,7 @@ impl Cpu {
     }
 }
 
-#[derive(Serialize,Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Process {
     pid: u32,
     usr: String,
@@ -133,38 +138,39 @@ pub struct Process {
 }
 
 impl FromStr for Process {
-   type Err = ();
+    type Err = ();
     fn from_str(line: &str) -> Result<Self, Self::Err> {
-        let value:Vec<&str> = line.split_whitespace().collect();
+        let value: Vec<&str> = line.split_whitespace().collect();
         Ok(Process {
             pid: value[0].parse::<u32>().unwrap(),
             usr: value[1].to_string(),
             cpu: value[8].parse::<f64>().unwrap(),
             mem: value[9].parse::<f64>().unwrap(),
-            time:value[10].to_string(),
+            time: value[10].to_string(),
             command: value[11].to_string(),
         })
     }
 }
 
-
 #[cfg(test)]
-pub mod test{
-    use std::{fs, io::{self, BufRead}};
+pub mod test {
     use super::Cpu;
-
+    use std::{
+        fs,
+        io::{self, BufRead},
+    };
 
     #[test]
-    pub fn test_cpu(){
+    pub fn test_cpu() {
         let file = fs::File::open("D:\\dump\\20240809\\日志\\异步节点\\20240809.tar\\20240809\\20240809_22\\20240809_223714\\cpu_top_17606.log").unwrap();
         let reader = io::BufReader::new(file);
-        let mut lines_storage:Vec<String> = Vec::new();
+        let mut lines_storage: Vec<String> = Vec::new();
 
         for line in reader.lines() {
             lines_storage.push(line.unwrap());
         }
-        
-        let result = Cpu::new(lines_storage);
+
+        let result = Cpu::new(lines_storage,"A","c");
         println!("{:?}", result);
     }
 }

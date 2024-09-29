@@ -1,4 +1,4 @@
-use crate::{error::AnalysisError, files::*, models::thread::StatusQuery, service::thread_dump, state::AppState};
+use crate::{error::AnalysisError, models::thread::StatusQuery, service::{file_service, thread_dump}, state::AppState};
 use actix_web::{web, HttpResponse};
 
 pub async fn list_dump_handler(
@@ -8,7 +8,7 @@ pub async fn list_dump_handler(
     if path.clone().is_empty() {
         return Ok(HttpResponse::Ok().json("请先选择需要解析的文件或文件夹"));
     }
-    file::list_dump_file(&path.clone()).map(|files| HttpResponse::Ok().json(files))
+    file_service::list_dump_file(&app_state.pool, &path).map(|files| HttpResponse::Ok().json(files))
 }
 
 pub async fn query_stack(

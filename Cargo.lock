@@ -2278,6 +2278,7 @@ dependencies = [
  "chrono",
  "dotenv",
  "lazy_static",
+ "rand",
  "regex",
  "serde",
  "serde_derive",

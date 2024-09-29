@@ -1,15 +1,18 @@
-use actix_web::web;
+use actix_web::web::{self, Form};
+use chrono::NaiveDateTime;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use crate::models::config::EnvVars;
+use crate::{common::utils, error::ThreadError, models::config::EnvVars};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct FileInfo {
+    pub id: String,
+    pub work_space: String,
     pub path: String,
     pub file_type: FileType,
-    pub time: Option<String>,
+    pub time: Option<NaiveDateTime>,
 }
 
 lazy_static::lazy_static! {
@@ -23,7 +26,7 @@ impl From<web::Json<FileInfo>> for FileInfo {
 }
 
 impl FileInfo {
-    pub fn new(path: &PathBuf) -> Self {
+    pub fn new(path: &PathBuf, work_space: &str) -> Self {
         let file_name = path
             .file_name()
             .and_then(|os_str| os_str.to_str())
@@ -36,18 +39,23 @@ impl FileInfo {
             None
         };
         FileInfo {
+            id: utils::rand_id(),
+            work_space: work_space.into(),
             path: path.to_str().expect("Invalid Path").to_string(),
             file_type,
             time,
         }
     }
 
-    fn extract_time_info(file_name: &str) -> Option<String> {
+    fn extract_time_info(file_name: &str) -> Option<NaiveDateTime> {
         // 查找匹配项并提取时间信息
-        REGEX_TIME
+        match REGEX_TIME
             .captures(file_name)
             .and_then(|caps| caps.get(1))
-            .map(|m| m.as_str().to_string())
+            .map(|m| m.as_str().to_string()) {
+                Some(time) => Some(utils::parse_time(&time).unwrap()),
+                None => None,
+            }
     }
 }
 
@@ -77,5 +85,28 @@ impl FileType {
 impl From<web::Json<FileType>> for FileType {
     fn from(file_type: web::Json<FileType>) -> Self {
         file_type.into_inner()
+    }
+}
+
+
+impl TryFrom<i8> for FileType{
+    type Error = ThreadError;
+
+    fn try_from(value: i8) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(FileType::CpuThread),
+            1 => Ok(FileType::CpuTop),
+            1 => Ok(FileType::StackTrace),
+            1 => Ok(FileType::Gc),
+            1 => Ok(FileType::GcUtil),
+            _ => Ok(FileType::None)
+        }
+    }
+}
+
+
+impl From<FileType> for i8 {
+    fn from(value: FileType) -> Self {
+        value as i8
     }
 }

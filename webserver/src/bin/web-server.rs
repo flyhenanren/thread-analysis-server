@@ -1,5 +1,5 @@
 use actix_web::{web, App, HttpServer};
-use db::db::*;
+use db_access::db::*;
 use std::io;
 use std::sync::Mutex;
 use dotenv::dotenv;
@@ -10,8 +10,8 @@ mod handlers;
 mod routers;
 #[path = "../state.rs"]
 mod state;
-#[path ="../files/mod.rs"]
-mod files;
+#[path ="../file/mod.rs"]
+mod file;
 #[path ="../models/mod.rs"]
 mod models;
 #[path ="../error.rs"]
@@ -22,8 +22,8 @@ mod common;
 #[path = "../service/mod.rs"]
 mod service;
 
-#[path = "../db/mod.rs"]
-mod db;
+#[path = "../db_access/mod.rs"]
+mod db_access;
 
 use routers::*;
 use state::AppState;

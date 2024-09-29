@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{FrameError, ThreadError};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Thread {
     pub id: Option<String>,
     pub name: String,
@@ -28,7 +28,7 @@ lazy_static::lazy_static! {
 }
 
 impl Thread {
-    pub fn new(lines: Vec<String>) -> Result<Self, ThreadError> {
+    pub fn new(lines: &Vec<String>) -> Result<Self, ThreadError> {
         let (name, id, daemon, prio, os_prio, tid, nid, state, address) =
             Self::parse_thread_info(&lines[0])?;
 
@@ -169,14 +169,39 @@ impl Thread {
 }
 
 #[derive(Serialize, Deserialize, Debug,Clone, PartialEq)]
+#[repr(i8)]
 pub enum ThreadStatus {
-    Runnable,
-    Blocked,
-    Waiting,
-    TimedWaiting,
-    Terminated,
-    New,
-    Unknown,
+    Runnable = 1,
+    Blocked = 2,
+    Waiting = 3,
+    TimedWaiting = 4,
+    Terminated = 5,
+    New = 6,
+    Unknown = 0,
+}
+
+// 实现 TryFrom<i8> 以处理从整数到枚举的转换
+impl TryFrom<i8> for ThreadStatus {
+    type Error = ThreadError;
+
+    fn try_from(value: i8) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(ThreadStatus::Runnable),
+            2 => Ok(ThreadStatus::Blocked),
+            3 => Ok(ThreadStatus::Waiting),
+            4 => Ok(ThreadStatus::TimedWaiting),
+            5 => Ok(ThreadStatus::Terminated),
+            6 => Ok(ThreadStatus::New),
+            _ => Ok(ThreadStatus::Unknown),
+        }
+    }
+}
+
+// 实现 From<ThreadStatus> 以便轻松转换为整数
+impl From<ThreadStatus> for i8 {
+    fn from(status: ThreadStatus) -> Self {
+        status as i8
+    }
 }
 
 impl FromStr for ThreadStatus {
@@ -209,7 +234,7 @@ impl ThreadStatus {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct CallFrame {
     pub class_name: String,
     pub method_name: Option<String>,
@@ -257,10 +282,7 @@ impl CallFrame {
                 .expect(format!("无法识别的class name:{}", after_prefix).as_str())
                 .trim()
                 .to_string();
-            let frame = match Frame::from_str(parts, frame_info) {
-                Ok(frame) => frame,
-                Err(e) => return Err(ThreadError::ParseError(e.to_string())),
-            };
+            let frame = Frame::from_str(parts, frame_info)?;
             return Ok(CallFrame {
                 class_name,
                 method_name: None,
@@ -271,7 +293,7 @@ impl CallFrame {
         Err(ThreadError::ParseError("分割失败".to_string()))
     }
 }
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug,Clone, PartialEq)]
 pub enum Frame {
     MethodCall,
     Lock {
@@ -334,35 +356,30 @@ fn extract_address(input: &str) -> u64 {
     }
     0x0000000000000000
 }
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug,Clone,  PartialEq)]
 pub enum MonitorAction {
     WaitingToLock,
     WaitingOn,
     Locked,
 }
 
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ThreadsInfo {
+pub struct StackDumpInfo {
     pub file_name: String,
     pub time: NaiveDateTime,
     pub run_threads: i32,
     pub block_threads: i32,
     pub threads: i32,
-    pub start_line: i64,
-    pub end_line: i64,
 }
 
-impl ThreadsInfo {
+impl StackDumpInfo {
     pub fn new(file_name: &str, time: &NaiveDateTime, threads: i32) -> Self {
-        ThreadsInfo {
+        StackDumpInfo {
             file_name: file_name.into(),
             time: time.clone(),
             run_threads: 0,
             block_threads: 0,
-            threads,
-            start_line:0,
-            end_line:0,
+            threads
         }
     }
 
@@ -373,24 +390,16 @@ impl ThreadsInfo {
     pub fn increment_block(&mut self) {
         self.block_threads += 1;
     }
-    pub fn set_start_line(&mut self, line: i64){
-        self.start_line = line;
-    }
-    pub fn set_end_line(&mut self, line: i64){
-        self.end_line = line;
-    }
 }
 
-impl From<web::Json<ThreadsInfo>> for ThreadsInfo {
-    fn from(dump_file: web::Json<ThreadsInfo>) -> Self {
-        ThreadsInfo {
+impl From<web::Json<StackDumpInfo>> for StackDumpInfo {
+    fn from(dump_file: web::Json<StackDumpInfo>) -> Self {
+        StackDumpInfo {
             file_name: dump_file.file_name.clone(),
             time: dump_file.time.clone(),
             run_threads: dump_file.run_threads,
             block_threads: dump_file.block_threads,
             threads: dump_file.threads,
-            start_line: dump_file.start_line,
-            end_line: dump_file.end_line,
         }
     }
 }
@@ -452,7 +461,7 @@ pub mod tests {
           "at com.example.MyClass.run(MyClass.java:5)".to_string(),
           "at java.lang.Thread.run(Thread.java:748)".to_string()
     ];
-        let result = Thread::new(lines);
+        let result = Thread::new(&lines);
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
@@ -498,7 +507,7 @@ pub mod tests {
           "at com.example.MyClass.run(MyClass.java:15)".to_string(),
           "at java.lang.Thread.run(Thread.java:748)".to_string()     
         ];
-        let result = Thread::new(lines);
+        let result = Thread::new(&lines);
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
@@ -556,7 +565,7 @@ pub mod tests {
           "at com.example.MyClass.run(MyClass.java:25)".to_string(),
           "at java.lang.Thread.run(Thread.java:748)".to_string(),
         ];
-        let result = Thread::new(lines);
+        let result = Thread::new(&lines);
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
@@ -630,7 +639,7 @@ pub mod tests {
           "at com.example.MyClass.run(MyClass.java:35)".to_string(),
           "at java.lang.Thread.run(Thread.java:748)".to_string(),
         ];
-        let result = Thread::new(lines);
+        let result = Thread::new(&lines);
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
@@ -684,7 +693,7 @@ pub mod tests {
           "at com.example.MyClass.run(MyClass.java:55)".to_string(),
           "at java.lang.Thread.run(Thread.java:748)".to_string()
         ];
-        let result = Thread::new(lines);
+        let result = Thread::new(&lines);
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
@@ -762,7 +771,7 @@ pub mod tests {
           "at com.example.MyClass.run(MyClass.java:65)".to_string(),
           "at java.lang.Thread.run(Thread.java:748)".to_string(),
         ];
-        let result = Thread::new(lines);
+        let result = Thread::new(&lines);
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
@@ -842,7 +851,7 @@ pub mod tests {
           "at com.example.MyClass.run(MyClass.java:45)".to_string(),
           "at java.lang.Thread.run(Thread.java:748)".to_string()
         ];
-        let result = Thread::new(lines);
+        let result = Thread::new(&lines);
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
@@ -914,7 +923,7 @@ pub mod tests {
         let lines = vec![
           "\"GC task thread#0 (ParallelGC)\" os_prio=0 tid=0x0000ffff8c060800 nid=0xec316 runnable ".to_string(),
     ];
-        let result = Thread::new(lines);
+        let result = Thread::new(&lines);
         let mut frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: None,
@@ -936,7 +945,7 @@ pub mod tests {
         let lines = vec![
             "\"VM Thread\" os_prio=0 tid=0x0000ffff8c132000 nid=0xec341 runnable ".to_string(),
         ];
-        let result = Thread::new(lines);
+        let result = Thread::new(&lines);
         let mut frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: None,
@@ -958,7 +967,7 @@ pub mod tests {
         let lines = vec![
           "\"VM Periodic Task Thread\" os_prio=0 tid=0x0000ffff8c1ab000 nid=0xec358 waiting on condition ".to_string(),
     ];
-        let result = Thread::new(lines);
+        let result = Thread::new(&lines);
         let mut frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: None,
@@ -980,7 +989,7 @@ pub mod tests {
         let lines = vec![
           "\"消息接收线程\" #206 prio=5 os_prio=0 tid=0x0000fffc052fa000 nid=0xed49b sleeping[0x0000fffea63fe000]".to_string(),
     ];
-        let result = Thread::new(lines);
+        let result = Thread::new(&lines);
         let mut frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: Some("#206".into()),
@@ -1001,7 +1010,7 @@ pub mod tests {
         let lines = vec![
           "\"lettuce-timer-3-1\" #63 daemon prio=5 os_prio=0 tid=0x0000fffd7ac8e000 nid=0xec9e9 sleeping[0x0000ffff075fe000]".to_string(),
     ];
-        let result = Thread::new(lines);
+        let result = Thread::new(&lines);
         let mut frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: Some("#63".into()),

@@ -26,5 +26,8 @@ lazy_static = "1.4"
 
 # 数据库配置
 sqlx = {version= "0.8.2", features=["runtime-tokio","tls-rustls","sqlite","time","chrono"]}
+
+# 生成随机数
+rand = "0.8"
 [[bin]]
 name="web-server"
