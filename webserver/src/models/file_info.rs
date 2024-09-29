@@ -53,7 +53,7 @@ impl FileInfo {
             .captures(file_name)
             .and_then(|caps| caps.get(1))
             .map(|m| m.as_str().to_string()) {
-                Some(time) => Some(utils::parse_time(&time).unwrap()),
+                Some(time) => Some(utils::parse_thread_time(&time).unwrap()),
                 None => None,
             }
     }

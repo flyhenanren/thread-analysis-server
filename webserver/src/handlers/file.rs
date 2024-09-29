@@ -12,7 +12,7 @@ pub async fn load_file_handler(
             match exist {
                 true => Ok(HttpResponse::Ok().json("OK")),
                 false => {
-                    let _ = file_service::analysis(&app_state.pool, &path).await;
+                    let _ = file_service::analysis(&app_state.pool, &path).await?;
                     Ok(HttpResponse::Ok().json("OK"))
                 }
             }

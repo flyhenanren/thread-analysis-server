@@ -126,7 +126,7 @@ impl ParseFile<HashMap<String, Vec<Thread>>, FileInfo> for ThreadParser {
                         }
                         if time.is_none() {
                             if utils::is_valid_datetime(&line) {
-                                let parsed_time = utils::parse_time(&line).unwrap();
+                                let parsed_time = utils::parse_data_time(&line).unwrap();
                                 time = Some(parsed_time);
                                 if start_time.is_none() {
                                     start_time = Some(parsed_time);

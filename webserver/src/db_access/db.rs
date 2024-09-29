@@ -1,6 +1,6 @@
 use std::env;
 
-use chrono::{Local, NaiveDateTime, Utc};
+use chrono::{Local, NaiveDateTime, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 use sqlx::{FromRow, Pool, Sqlite, SqlitePool};
@@ -53,16 +53,16 @@ pub struct ThreadStack {
     pub work_space: String,
     pub thread_id: String,
     pub class_name: String,
-    pub method_name: String,
-    pub stack_lin: u32,
+    pub method_name: Option<String>,
+    pub stack_lin: Option<u32>,
     pub stack_status: String,
 }
 
 #[derive(Serialize, Debug, Clone, FromRow)]
 pub struct CpuInfo {
     pub id: String,
-    pub worksapce: String,
-    pub exe_time: NaiveDateTime,
+    pub workspace: String,
+    pub exe_time: NaiveTime,
     pub us: f64,
     pub sy: f64,
     pub ids: f64,
@@ -110,7 +110,7 @@ impl ModelTransfer<Cpu, CpuInfo> for CpuInfo {
     fn new(file: &Cpu, _file_id: &str, work_space: &str) -> CpuInfo {
         CpuInfo {
             id: utils::rand_id(),
-            worksapce: work_space.into(),
+            workspace: work_space.into(),
             exe_time: file.exe_time,
             us: file.us,
             sy: file.sy,
@@ -148,8 +148,8 @@ impl ThreadStack{
                 work_space: work_space.into(),
                 thread_id: thread_id.into(),
                 class_name: frame.class_name,
-                method_name: frame.method_name.unwrap(),
-                stack_lin: frame.line_number.unwrap(),
+                method_name: frame.method_name,
+                stack_lin: frame.line_number,
                 stack_status: to_string(&frame.frame).unwrap(),
             }
         })

@@ -2,12 +2,11 @@ use sqlx::{SqlitePool, Transaction};
 
 use crate::{error::DBError, MemoryInfo};
 
-pub async fn batch_add(pool: &SqlitePool, mem_infos: &Vec<MemoryInfo>) -> Result<Vec<MemoryInfo>, DBError> {
+pub async fn batch_add(pool: &SqlitePool, mem_infos: &Vec<MemoryInfo>) -> Result<(), DBError> {
     let transaction: Transaction<'_, sqlx::Sqlite> = pool.begin().await?;
-    let mut rows = Vec::with_capacity(mem_infos.len());
     for mem_info in mem_infos {
-        let row = sqlx::query_as::<_, MemoryInfo>(
-            r#"INSERT INTO MEMORY_INFO (ID, WORKSAPCE, OWN_FILE, S0, S0C, S0U, S1C, S1U, EC, EU, OC, OU, MC, MU, CCSC, CCSU, YGC, YGCT, FGC, FGCT, CGC, CGCT, GCT, EXE_TIME)
+        sqlx::query(
+            r#"INSERT INTO MEMORY_INFO (ID, WORKSAPCE, MEMORY_INFO, S0, S0C, S0U, S1C, S1U, EC, EU, OC, OU, MC, MU, CCSC, CCSU, YGC, YGCT, FGC, FGCT, CGC, CGCT, GCT, EXE_TIME)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"#)
              .bind(mem_info.id.clone())
              .bind(mem_info.workspace.clone())
@@ -33,12 +32,11 @@ pub async fn batch_add(pool: &SqlitePool, mem_infos: &Vec<MemoryInfo>) -> Result
             .bind(mem_info.cgct)
             .bind(mem_info.gct)
             .bind(mem_info.exe_time)
-            .fetch_one(pool)
+            .execute(pool)
             .await?;    
-        rows.push(row);
     }
     transaction.commit().await?;
-    Ok(rows)
+    Ok(())
 }
 
 pub async fn list(pool: &SqlitePool, work_space: &str) -> Result<Vec<MemoryInfo>, DBError> {

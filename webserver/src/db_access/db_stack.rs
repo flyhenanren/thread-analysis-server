@@ -6,7 +6,7 @@ pub async fn batch_add(pool: &SqlitePool, threads: &Vec<ThreadStack>) -> Result<
     let transaction: Transaction<'_, sqlx::Sqlite> = pool.begin().await?;
     for thread in threads {
         sqlx::query(
-            r#"INSERT INTO THREAD_STACK (ID, WORKSPACE, THREAD_ID, CLASS_NAME, METHOD_NAME, STACK_NAME, STACK_STATUS)
+            r#"INSERT INTO THREAD_STACK (ID, WORKSPACE, THREAD_ID, CLASS_NAME, METHOD_NAME, STACK_LINE, STACK_STATUS)
             VALUES (?,?,?,?,?,?,?)"#)
         .bind(thread.id.clone())
         .bind(thread.work_space.clone())
@@ -23,7 +23,7 @@ pub async fn batch_add(pool: &SqlitePool, threads: &Vec<ThreadStack>) -> Result<
 }
 
 pub async fn list(pool: &SqlitePool, work_space:&str) -> Result<Vec<ThreadStack>, DBError> {
-    let stack = sqlx::query_as::<_, ThreadStack>("SELECT * FROM THREAD_STACK WHERE WORKSAPCE = ?")
+    let stack = sqlx::query_as::<_, ThreadStack>("SELECT * FROM THREAD_STACK WHERE WORKSPACE = ?")
         .bind(work_space.clone())
         .fetch_all(pool)
         .await?;

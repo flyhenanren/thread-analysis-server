@@ -7,7 +7,7 @@ pub async fn batch_add(pool: &SqlitePool, cpu_infos: Vec<CpuInfo>, work_space: &
     for info in cpu_infos {
         sqlx::query(
             r#"INSERT INTO CPU_INFO (id,workspace, exe_time, us, sy, ids, tasks, running, sleeping, mem_total, mem_free, mem_used)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?) "#)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "#)
              .bind(info.id)
              .bind(work_space)
             .bind(info.exe_time)

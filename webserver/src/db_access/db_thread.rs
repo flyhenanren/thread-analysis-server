@@ -6,9 +6,9 @@ pub async fn batch_add(pool: &SqlitePool, thread_infos: Vec<ThreadInfo>, work_sp
     let transaction: Transaction<'_, sqlx::Sqlite> = pool.begin().await?;
 
     for thread_info in thread_infos {
-        sqlx::query_as::<_, ThreadInfo>(
-            r#"INSERT INTO THREAD_INFO (ID, WORKSPACE, OWN_FILE, THREAD_ID, THREAD_NAME, DAEMON, THREAD_STATUS)
-             VALUES (?,?,?,?,?,?,?,?,?)"#)
+        sqlx::query(
+            r#"INSERT INTO THREAD_INFO (ID, WORKSPACE, FILE_ID, THREAD_ID, THREAD_NAME, DAEMON, THREAD_STATUS)
+             VALUES (?,?,?,?,?,?,?)"#)
              .bind(thread_info.id)
              .bind(work_space)
             .bind(thread_info.file_id)
@@ -16,7 +16,7 @@ pub async fn batch_add(pool: &SqlitePool, thread_infos: Vec<ThreadInfo>, work_sp
             .bind(thread_info.thread_name)
             .bind(thread_info.daemon)
             .bind(thread_info.thread_status)
-            .fetch_one(pool)
+            .execute(pool)
             .await?;
     }
     transaction.commit().await?;
@@ -40,7 +40,7 @@ pub async fn get(pool: &SqlitePool, id: i32) -> Result<ThreadInfo, DBError> {
 }
 
 pub async fn delete(pool: &SqlitePool, id: i32) -> Result<bool, DBError> {
-    let result = sqlx::query("DELETE * FROM FILE_WORKSAPCE WHERE ID = ?")
+    let result = sqlx::query("DELETE * FROM FILE_WORKSPACE WHERE ID = ?")
         .bind(id)
         .execute(pool)
         .await?;

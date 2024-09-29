@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use sqlx::SqlitePool;
+use sqlx::{SqlitePool, Transaction};
 
 use crate::{
     common::file_utils::{self}, db_access::{db_cpu, db_file, db_memeory, db_stack, db_thread, db_worksapce}, error::AnalysisError, file::parse::{CpuParser, MemoryParser, ParseFile, ThreadParser}, models::{file_info::FileInfo, thread::StackDumpInfo}, CpuInfo, FileWorkSpace, MemoryInfo, ModelTransfer, SourceFileInfo, ThreadInfo, ThreadStack
@@ -16,15 +16,15 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
     let files: Vec<FileInfo> = match file_type {
         1 => {
             work_space = FileWorkSpace::new(&path);
-            let file_work_space = db_worksapce::add(pool, &work_space).await?;
-            file_utils::extract_file(source_path, &file_work_space.id)
+            db_worksapce::add(pool, &work_space).await?;
+            file_utils::extract_file(source_path, &work_space.id)
             .unwrap_or_else(|e| panic!("读取文件时发生错误：{}", e))    
         }
         _ => {
             let unzip_path: &Path = source_path.parent().expect("获取压缩包的上级路径错误");
             work_space = FileWorkSpace::new(unzip_path.to_str().unwrap());
-            let file_work_space = db_worksapce::add(pool, &work_space).await?;
-            file_utils::unzip_and_extract_file(source_path, &file_work_space.id)
+            db_worksapce::add(pool, &work_space).await?;
+            file_utils::unzip_and_extract_file(source_path, &work_space.id)
             .unwrap_or_else(|e| panic!("读取文件时发生错误：{}", e))}
     };
     let cpu_info = CpuParser::parse(path, &files)?;
@@ -81,7 +81,6 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
                     .map(|mem| MemoryInfo::new(&mem, &work_space.id))
                     .collect()
                 ).await?;
-    
     Ok(())
 }
 
@@ -120,12 +119,14 @@ mod tests {
     #[actix_rt::test]
     async fn test_walk_dir_all() {
         let path = Path::new("D:\\dump\\20240726");
+        dotenv().ok();
         let pool: sqlx::Pool<sqlx::Sqlite> = db::establish_connection().await;
         analysis(&pool, path.as_str());
     }
     #[actix_rt::test]
     async fn test_walk_dir() {
         let path = Path::new("D:\\dump\\20240809_1");
+        dotenv().ok();
         let pool: sqlx::Pool<sqlx::Sqlite> = db::establish_connection().await;
         analysis(&pool, path.as_str());
     }

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, NaiveTime};
 use serde::{Deserialize, Serialize};
 
 use crate::common::utils;
@@ -9,7 +9,7 @@ use crate::common::utils;
 pub struct Cpu {
     pub file_id: String,
     pub work_space: String,
-    pub exe_time: NaiveDateTime,
+    pub exe_time: NaiveTime,
     pub us: f64,
     pub sy: f64,
     pub ids: f64,
@@ -49,7 +49,7 @@ impl Cpu {
     fn extract_main(line: &str) -> String {
         let infos: Vec<&str> = line.split(",").collect();
         let cpu_running: Vec<&str> = infos[0].split_whitespace().collect();
-        cpu_running[cpu_running.len() - 2].to_string()
+        cpu_running[2].to_string()
     }
 
     fn extract_threads(line: &str) -> (u32, u32, u32) {
