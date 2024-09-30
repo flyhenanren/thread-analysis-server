@@ -68,33 +68,3 @@ fn write(lines: &Vec<String>, path: &str, file_name: &str) -> std::io::Result<()
     }
     Ok(())
 }
-
-
-
-#[derive(Serialize, Deserialize)]
-pub struct DumpInfo {
-    pub start_time: NaiveDateTime,
-    pub time_cycle: i64,
-}
-
-pub fn write_dump(dump_info: DumpInfo, path: &str) {
-    let _ = write(&vec![to_string(&dump_info).expect("msg")], path, "dump_idx");
-}
-
-pub fn read_dump(path: &str) -> io::Result<DumpInfo> {
-    read(path, "dump_idx")?
-        .into_iter()
-        .find_map(|line| {
-            match from_str::<DumpInfo>(&line) {
-                Ok(info) => Some(Ok(info)), // 返回解析成功的 DumpInfo
-                Err(_) => None,             // 如果解析失败，则返回 None，继续查找下一个
-            }
-        })
-        .unwrap_or_else(|| {
-            // 如果没有成功解析的条目，返回错误
-            Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "无法解析任何有效的 DumpInfo",
-            ))
-        })
-}

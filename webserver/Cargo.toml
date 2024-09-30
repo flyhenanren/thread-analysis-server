@@ -29,5 +29,10 @@ sqlx = {version= "0.8.2", features=["runtime-tokio","tls-rustls","sqlite","time"
 
 # 生成随机数
 rand = "0.8"
+# 并行处理集合
+rayon = "1.10.0" 
+
+# CPU核心数
+num_cpus = "1.16"
 [[bin]]
 name="web-server"

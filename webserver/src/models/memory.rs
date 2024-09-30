@@ -7,17 +7,17 @@ use std::{fs, io, path::Path};
 #[derive(Serialize,Deserialize,Debug, PartialEq)]
 pub struct MemoryValue {
     pub file_id: String,
-    pub time: NaiveDateTime,
+    pub time: Option<NaiveDateTime>,
     pub value: Vec<f64>,
 }
 #[derive(Serialize,Deserialize, Debug, PartialEq)]
 pub struct MemoryPercent {
-    time: NaiveDateTime,
+    time: Option<NaiveDateTime>,
     value: Vec<f64>,
 }
 
 impl MemoryValue {
-    pub fn new(time: NaiveDateTime, filed_id: &str, line: &str) -> Self {
+    pub fn new(time: Option<NaiveDateTime>, filed_id: &str, line: &str) -> Self {
         MemoryValue {
             file_id: filed_id.into(),
             time,
@@ -41,7 +41,7 @@ impl MemoryValue {
 }
 
 impl MemoryPercent {
-    pub fn new(time: NaiveDateTime, line: &str) -> Self {
+    pub fn new(time: Option<NaiveDateTime>, line: &str) -> Self {
         MemoryPercent {
             time,
             value: Self::split_value(line),
@@ -67,8 +67,10 @@ pub fn create(path: &str) -> (MemoryValue, MemoryPercent) {
     let file_path = Path::new(path);
     let path_time = file_path.parent().expect("无法获取上级");
     let fmt = "%Y%m%d_%H%M%S";
-    let time = NaiveDateTime::parse_from_str(path_time.file_name().unwrap().to_str().unwrap(), fmt)
-        .unwrap();
+    let time = match NaiveDateTime::parse_from_str(path_time.file_name().unwrap().to_str().unwrap(), fmt){
+        Ok(time) => Some(time),
+        Err(err) => None,
+    };
     let file = fs::File::open(path).unwrap();
     let reader = io::BufReader::new(file);
     let mut idx = 0;
@@ -89,8 +91,8 @@ pub fn create(path: &str) -> (MemoryValue, MemoryPercent) {
 
 pub fn batch_crate_memory_info(
     file_path: &str,
-    start: NaiveDateTime,
-    cycle: i64,
+    start: Option<NaiveDateTime>,
+    cycle: Option<i64>,
 ) -> Vec<MemoryValue> {
     let mut memory_info = Vec::new();
     let file = fs::File::open(file_path).unwrap();
@@ -106,7 +108,9 @@ pub fn batch_crate_memory_info(
         if flag {
             let mem_info = MemoryValue::new(current_time, file_path, &line);
             memory_info.push(mem_info);
-            current_time = current_time.checked_add_signed(Duration::seconds(cycle.into())).expect("时间转换失败");
+            if cycle.is_some() && current_time.is_some(){
+                current_time = current_time.unwrap().checked_add_signed(Duration::seconds(cycle.unwrap().into()));    
+            }
             flag = false;
         }
     }
@@ -115,8 +119,8 @@ pub fn batch_crate_memory_info(
 
 pub fn batch_crate_memory_percent(
     file_path: &str,
-    start: NaiveDateTime,
-    cycle: u32,
+    start: Option<NaiveDateTime>,
+    cycle: Option<u32>,
 ) -> Vec<MemoryPercent> {
     let mut memory_info = Vec::new();
     let file = fs::File::open(file_path).unwrap();
@@ -132,7 +136,9 @@ pub fn batch_crate_memory_percent(
         if flag {
             let mem_info = MemoryPercent::new(current_time, &line);
             memory_info.push(mem_info);
-            current_time = current_time.checked_add_signed(Duration::seconds(cycle.into())).expect("时间转换失败");
+            if cycle.is_some() && current_time.is_some() {
+                current_time = current_time.unwrap().checked_add_signed(Duration::seconds(cycle.unwrap().into()));    
+            }
             flag = false;
         }
     }
@@ -177,7 +183,10 @@ pub mod tests {
         ];
         let file_name = "20240809_170136";
         let fmt = "%Y%m%d_%H%M%S";
-        let time = NaiveDateTime::parse_from_str(&file_name, fmt).unwrap();
+        let time = match NaiveDateTime::parse_from_str(&file_name, fmt){
+            Ok(time) => Some(time),
+            Err(err) => None,
+        };
         let mut flag = false;
         let mut result: Vec<MemoryValue> = Vec::new();
         for line in lines {

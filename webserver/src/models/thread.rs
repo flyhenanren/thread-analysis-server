@@ -1,8 +1,9 @@
-use std::str::FromStr;
 use actix_web::web;
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 use crate::error::{FrameError, ThreadError};
 
@@ -31,7 +32,6 @@ impl Thread {
     pub fn new(lines: &Vec<String>) -> Result<Self, ThreadError> {
         let (name, id, daemon, prio, os_prio, tid, nid, state, address) =
             Self::parse_thread_info(&lines[0])?;
-
         let status = match lines.len() == 1 {
             true => ThreadStatus::parse(&state),
             false => match ThreadStatus::from_str(&lines[1]) {
@@ -48,11 +48,11 @@ impl Thread {
         let mut frames: Vec<CallFrame> = Vec::new();
         if lines.len() > 1 {
             let call_info = &lines[2..=lines.len() - 1];
-            for call in call_info {
-                frames.push(CallFrame::new(&call)?);
-            }    
+            frames = call_info
+                .par_iter()
+                .filter_map(|call| CallFrame::new(&call).ok())
+                .collect();
         }
-
         Ok(Thread {
             id,
             name,
@@ -168,7 +168,7 @@ impl Thread {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug,Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[repr(i8)]
 pub enum ThreadStatus {
     Runnable = 1,
@@ -293,7 +293,7 @@ impl CallFrame {
         Err(ThreadError::ParseError("分割失败".to_string()))
     }
 }
-#[derive(Serialize, Deserialize, Debug,Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Frame {
     MethodCall,
     Lock {
@@ -356,7 +356,7 @@ fn extract_address(input: &str) -> u64 {
     }
     0x0000000000000000
 }
-#[derive(Serialize, Deserialize, Debug,Clone,  PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum MonitorAction {
     WaitingToLock,
     WaitingOn,
@@ -379,7 +379,7 @@ impl StackDumpInfo {
             time: time.clone(),
             run_threads: 0,
             block_threads: 0,
-            threads
+            threads,
         }
     }
 
@@ -405,7 +405,7 @@ impl From<web::Json<StackDumpInfo>> for StackDumpInfo {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct StatusCount{
+pub struct StatusCount {
     pub name: String,
     pub runnable: usize,
     pub waitting: usize,
@@ -426,11 +426,11 @@ impl From<web::Json<StatusCount>> for StatusCount {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct StatusQuery{
+pub struct StatusQuery {
     pub files: Vec<String>,
     pub total: Option<usize>,
     pub exclude: Option<Vec<String>>,
-    pub status: Option<Vec<ThreadStatus>>
+    pub status: Option<Vec<ThreadStatus>>,
 }
 
 impl From<web::Json<StatusQuery>> for StatusQuery {
@@ -443,7 +443,6 @@ impl From<web::Json<StatusQuery>> for StatusQuery {
         }
     }
 }
-
 
 #[cfg(test)]
 pub mod tests {

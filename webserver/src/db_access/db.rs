@@ -99,7 +99,7 @@ pub struct MemoryInfo {
     pub cgc: f64,
     pub cgct: f64,
     pub gct: f64,
-    pub exe_time: NaiveDateTime,
+    pub exe_time: Option<NaiveDateTime>,
 }
 
 pub trait ModelTransfer<T, U> {
@@ -213,7 +213,7 @@ impl MemoryInfo {
             cgc: memory.value[17],
             cgct: memory.value[18],
             gct: memory.value[19],
-            exe_time: memory.time.clone(),
+            exe_time: memory.time,
         }
     }
 }

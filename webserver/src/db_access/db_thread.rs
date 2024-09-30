@@ -1,25 +1,37 @@
+use std::any::Any;
+
+use chrono::Utc;
 use sqlx::{SqlitePool, Transaction};
 
 use crate::{error::DBError, ThreadInfo};
 
 pub async fn batch_add(pool: &SqlitePool, thread_infos: Vec<ThreadInfo>, work_space: &str) -> Result<(), DBError> {
-    let transaction: Transaction<'_, sqlx::Sqlite> = pool.begin().await?;
+    let start = Utc::now().timestamp_millis();
+    const BATCH_SIZE: usize = 1000; // 每个事务处理的最大记录数
+    for chunk in thread_infos.chunks(BATCH_SIZE) {
+        let start_pre = Utc::now().timestamp_millis();
+        // 开始一个新的事务
+        let mut transaction = pool.begin().await?;
 
-    for thread_info in thread_infos {
-        sqlx::query(
-            r#"INSERT INTO THREAD_INFO (ID, WORKSPACE, FILE_ID, THREAD_ID, THREAD_NAME, DAEMON, THREAD_STATUS)
-             VALUES (?,?,?,?,?,?,?)"#)
-             .bind(thread_info.id)
-             .bind(work_space)
-            .bind(thread_info.file_id)
-            .bind(thread_info.thread_id)
-            .bind(thread_info.thread_name)
+        // 构建批量插入的 SQL 语句
+        let insert_query = String::from(
+            r#"INSERT INTO THREAD_INFO (ID, WORKSPACE, FILE_ID, THREAD_ID, THREAD_NAME, DAEMON, THREAD_STATUS) VALUES (?, ?, ?, ?, ?, ?, ?)"#
+        );
+        for thread_info in chunk.iter(){
+            sqlx::query(&insert_query)
+            .bind(thread_info.id.to_owned())
+            .bind(work_space.to_owned())
+            .bind(thread_info.file_id.to_owned())
+            .bind(thread_info.thread_id.clone().unwrap_or_default())
+            .bind(thread_info.thread_name.to_owned())
             .bind(thread_info.daemon)
             .bind(thread_info.thread_status)
-            .execute(pool)
-            .await?;
+            .execute(&mut *transaction).await?;
+        }
+        transaction.commit().await?;
+        println!("end_per:{}", Utc::now().timestamp_millis() - start_pre);
     }
-    transaction.commit().await?;
+    println!("end:{}", Utc::now().timestamp_millis() - start);
     Ok(())
 }
 
