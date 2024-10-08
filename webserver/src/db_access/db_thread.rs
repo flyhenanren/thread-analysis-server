@@ -1,5 +1,3 @@
-use std::any::Any;
-
 use chrono::Utc;
 use sqlx::{SqlitePool, Transaction};
 
@@ -29,9 +27,7 @@ pub async fn batch_add(pool: &SqlitePool, thread_infos: Vec<ThreadInfo>, work_sp
             .execute(&mut *transaction).await?;
         }
         transaction.commit().await?;
-        println!("end_per:{}", Utc::now().timestamp_millis() - start_pre);
     }
-    println!("end:{}", Utc::now().timestamp_millis() - start);
     Ok(())
 }
 
