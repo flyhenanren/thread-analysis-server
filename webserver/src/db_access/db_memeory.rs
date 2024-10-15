@@ -6,12 +6,11 @@ pub async fn batch_add(pool: &SqlitePool, mem_infos: &Vec<MemoryInfo>) -> Result
     let transaction: Transaction<'_, sqlx::Sqlite> = pool.begin().await?;
     for mem_info in mem_infos {
         sqlx::query(
-            r#"INSERT INTO MEMORY_INFO (ID, WORKSAPCE, MEMORY_INFO, S0, S0C, S0U, S1C, S1U, EC, EU, OC, OU, MC, MU, CCSC, CCSU, YGC, YGCT, FGC, FGCT, CGC, CGCT, GCT, EXE_TIME)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"#)
+            r#"INSERT INTO MEMORY_INFO (ID, WORK_SPACE, FILE_ID, S0C, S0U, S1C, S1U, EC, EU, OC, OU, MC, MU, CCSC, CCSU, YGC, YGCT, FGC, FGCT, CGC, CGCT, GCT, EXE_TIME)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"#)
              .bind(mem_info.id.clone())
-             .bind(mem_info.workspace.clone())
+             .bind(mem_info.work_space.clone())
             .bind(mem_info.file_id.clone())
-            .bind(mem_info.s0)
             .bind(mem_info.s0c)
             .bind(mem_info.s0u)
             .bind(mem_info.s1c)
