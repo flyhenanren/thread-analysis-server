@@ -20,3 +20,13 @@ pub async fn load_file_handler(
         Err(err) => Err(AnalysisError::ActixError(format!("工作空间查询异常：{}",err))),
     }
 }
+
+
+pub async fn list_work_space(
+    app_state: web::Data<AppState>
+) -> Result<HttpResponse, AnalysisError>  {
+    match file_service::list_work_space(&app_state.pool).await {
+        Ok(work_space) => Ok(HttpResponse::Ok().json(work_space)),
+        Err(err) => Err(AnalysisError::ActixError(format!("工作空间查询异常：{}",err))),
+    }
+}

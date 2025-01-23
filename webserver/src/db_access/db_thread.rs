@@ -38,6 +38,14 @@ pub async fn list(pool: &SqlitePool) -> Result<Vec<ThreadInfo>, DBError> {
     Ok(work_space)
 }
 
+pub async fn list_by_status(pool: &SqlitePool, work_space_id: &str) -> Result<Vec<ThreadInfo>, DBError> {
+    let work_space = sqlx::query_as::<_, ThreadInfo>("SELECT * FROM FILE_WORKSPACE WHERE WORKSPACE = ?")
+        .bind(work_space_id)
+        .fetch_all(pool)
+        .await?;
+    Ok(work_space)
+}
+
 pub async fn get(pool: &SqlitePool, id: i32) -> Result<ThreadInfo, DBError> {
     let work_sapce =
         sqlx::query_as::<_, ThreadInfo>("SELECT * FROM FILE_WORKSPACE WHERE ID = ?")
@@ -54,4 +62,5 @@ pub async fn delete(pool: &SqlitePool, id: i32) -> Result<bool, DBError> {
         .await?;
     Ok(result.rows_affected() > 0)
 }
+
 

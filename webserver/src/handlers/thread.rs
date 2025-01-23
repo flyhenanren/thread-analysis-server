@@ -8,7 +8,8 @@ pub async fn list_dump_handler(
     if path.clone().is_empty() {
         return Ok(HttpResponse::Ok().json("请先选择需要解析的文件或文件夹"));
     }
-    file_service::list_dump_file(&app_state.pool, &path).map(|files| HttpResponse::Ok().json(files))
+    let files = file_service::list_dump_file(&app_state.pool, &path).await?;
+    Ok(HttpResponse::Ok().json(files))
 }
 
 pub async fn query_stack(

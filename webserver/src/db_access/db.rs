@@ -14,11 +14,15 @@ pub async fn establish_connection() -> Pool<Sqlite> {
         .expect("无法连接数据库")
 }
 
-#[derive(Serialize, Debug, Clone, FromRow)]
+#[derive(Serialize,Deserialize, Debug, Clone, FromRow)]
 pub struct FileWorkSpace {
+    #[sqlx(rename = "ID")]
     pub id: String,
+    #[sqlx(rename = "FILE_PATH")]
     pub file_path: String,
+    #[sqlx(rename = "CREATE_TIME")]
     pub create_time: NaiveDateTime,
+    #[sqlx(rename = "UPDATE_TIME")]
     pub update_time: NaiveDateTime,
 }
 

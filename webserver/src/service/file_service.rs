@@ -1,6 +1,7 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use chrono::Utc;
+use itertools::Itertools;
 use rayon::prelude::*;
 use sqlx::{SqlitePool};
 
@@ -8,8 +9,8 @@ use crate::{
     common::file_utils::{self},
     db_access::{db_cpu, db_file, db_memeory, db_stack, db_thread, db_worksapce},
     error::AnalysisError,
-    file::parse::{CpuParser, MemoryParser, ParseFile, ThreadParser},
-    models::{file_info::FileInfo, stack, thread::StackDumpInfo},
+    file::{self, parse::{CpuParser, MemoryParser, ParseFile, ThreadParser}},
+    models::{file_info::FileInfo, thread::{StackDumpInfo, ThreadStatus}},
     CpuInfo, FileWorkSpace, MemoryInfo, ModelTransfer, SourceFileInfo, ThreadInfo, ThreadStack,
 };
 
@@ -132,12 +133,48 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
 }
 
 /// 获取所有线程文件信息
-pub fn list_dump_file(pool: &SqlitePool, path: &str) -> Result<Vec<StackDumpInfo>, AnalysisError> {
-    Ok(vec![])
+pub async fn list_dump_file(pool: &SqlitePool, path: &str) -> Result<Vec<StackDumpInfo>, AnalysisError> {
+    return match db_worksapce::get_by_path(pool, path).await? {
+        Some(work_space) => {
+            let fils: Vec<SourceFileInfo> = db_file::list(pool, &work_space.id).await?;
+            let infos: HashMap<String, Vec<ThreadInfo>> = db_thread::list_by_status(pool, &work_space.id).await?
+                            .into_iter()
+                            .into_group_map_by(|info| info.file_id.clone());
+            let mut result: Vec<StackDumpInfo> = Vec::new();
+            for file in fils {
+                if let Some(thread_status_list ) = infos.get(&file.id) {
+                    let mut dump_info = StackDumpInfo {
+                        file_name: file.file_path.clone(),
+                        time: file.exe_time.unwrap_or_else(|| chrono::NaiveDateTime::from_timestamp_opt(0, 0).unwrap()),
+                        run_threads:0,
+                        block_threads: 0,
+                        threads:0
+                    };
+                    for status_info in thread_status_list  {
+                        dump_info.threads += 1;
+                        if let Ok(status) = ThreadStatus::try_from(status_info.thread_status) {
+                            match status {
+                                ThreadStatus::Runnable => dump_info.run_threads += 1,
+                                ThreadStatus::Blocked => dump_info.block_threads += 1,
+                                _ => {}
+                            }
+                        }
+                    }
+                    result.push(dump_info);
+                }
+            }
+            return Ok(vec![])
+        },
+        None => Ok(vec![])
+    }
 }
 
 pub async fn exist_work_space(pool: &SqlitePool, path: &str) -> Result<bool, AnalysisError> {
     Ok(db_worksapce::get_by_path(pool, path).await?.is_some())
+}
+
+pub async fn list_work_space(pool: &SqlitePool) -> Result<Vec<FileWorkSpace>, AnalysisError> {
+    Ok(db_worksapce::list(pool).await?)
 }
 
 #[cfg(test)]

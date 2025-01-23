@@ -37,7 +37,7 @@ async fn main() -> io::Result<()> {
 
     // 初始化共享数据
     let shared_data = web::Data::new(AppState {
-        path: Mutex::new("D:\\dump\\20240726".to_string()),
+        path: Mutex::new(String::new()), // 初始化工作空间
         pool
     });
 
