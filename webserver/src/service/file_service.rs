@@ -2,6 +2,7 @@ use std::{collections::HashMap, path::Path};
 
 use chrono::Utc;
 use itertools::Itertools;
+use log::{debug, info};
 use rayon::prelude::*;
 use sqlx::{SqlitePool};
 
@@ -38,22 +39,22 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
         }
     };
     let finish_unzip = Utc::now().timestamp_millis();
-    println!("finish_unzip:{}", finish_unzip - start);
+    debug!("finish_unzip:{}", finish_unzip - start);
 
     let cpu_info = CpuParser::parse(path, &files)?;
     let finish_parse_cpu = Utc::now().timestamp_millis();
-    println!("finish_parse_cpu:{}", finish_parse_cpu - finish_unzip);
+    debug!("finish_parse_cpu:{}", finish_parse_cpu - finish_unzip);
 
     let threads_map = ThreadParser::parse(path, &files)?;
     let finish_parse_thread = Utc::now().timestamp_millis();
-    println!(
+    debug!(
         "finish_parse_thread:{}",
         finish_parse_thread - finish_parse_cpu
     );
 
     let memory_info = MemoryParser::parse(path, &files)?;
     let finish_parse_memory = Utc::now().timestamp_millis();
-    println!(
+    debug!(
         "finish_parse_memory:{}",
         finish_parse_memory - finish_parse_thread
     );
@@ -67,7 +68,7 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
     )
     .await?;
     let finish_db_file = Utc::now().timestamp_millis();
-    println!("finish_db_file:{}", finish_db_file - finish_parse_memory);
+    debug!("finish_db_file:{}", finish_db_file - finish_parse_memory);
 
     db_cpu::batch_add(
         pool,
@@ -79,7 +80,7 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
     )
     .await?;
     let finish_db_cpu = Utc::now().timestamp_millis();
-    println!("finish_db_cpu:{}", finish_db_cpu - finish_db_file);
+    debug!("finish_db_cpu:{}", finish_db_cpu - finish_db_file);
 
     let work_space_id = &work_space.id;
     let threads_count = threads_map
@@ -95,7 +96,7 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
         .collect::<Vec<(ThreadInfo, Vec<ThreadStack>)>>();
 
     let finish_count_thread = Utc::now().timestamp_millis();
-    println!(
+    debug!(
         "finish_count_thread:{}",
         finish_count_thread - finish_db_cpu
     );
@@ -110,14 +111,14 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
 
     db_thread::batch_add(pool, threads_info, &work_space.id).await?;
     let finish_db_thread = Utc::now().timestamp_millis();
-    println!(
+    debug!(
         "finish_db_thread:{}",
         finish_db_thread - finish_count_thread
     );
 
     db_stack::batch_add(pool, &stack_info).await?;
     let finish_db_stack = Utc::now().timestamp_millis();
-    println!("finish_db_stack:{}", finish_db_stack - finish_db_thread);
+    debug!("finish_db_stack:{}", finish_db_stack - finish_db_thread);
 
     db_memeory::batch_add(
         pool,
@@ -128,16 +129,16 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
     )
     .await?;
     let finish_db_memory = Utc::now().timestamp_millis();
-    println!("finish_db_memory:{}", finish_db_memory - finish_db_stack);
+    debug!("finish_db_memory:{}", finish_db_memory - finish_db_stack);
     Ok(())
 }
 
 /// 获取所有线程文件信息
-pub async fn list_dump_file(pool: &SqlitePool, path: &str) -> Result<Vec<StackDumpInfo>, AnalysisError> {
-    return match db_worksapce::get_by_path(pool, path).await? {
+pub async fn list_dump_file(pool: &SqlitePool, work_space_id: &str) -> Result<Vec<StackDumpInfo>, AnalysisError> {
+    return match db_worksapce::get(pool, work_space_id).await? {
         Some(work_space) => {
             let fils: Vec<SourceFileInfo> = db_file::list(pool, &work_space.id).await?;
-            let infos: HashMap<String, Vec<ThreadInfo>> = db_thread::list_by_status(pool, &work_space.id).await?
+            let infos: HashMap<String, Vec<ThreadInfo>> = db_thread::list_by_work_space(pool, &work_space.id).await?
                             .into_iter()
                             .into_group_map_by(|info| info.file_id.clone());
             let mut result: Vec<StackDumpInfo> = Vec::new();

@@ -31,15 +31,8 @@ pub async fn batch_add(pool: &SqlitePool, thread_infos: Vec<ThreadInfo>, work_sp
     Ok(())
 }
 
-pub async fn list(pool: &SqlitePool) -> Result<Vec<ThreadInfo>, DBError> {
-    let work_space = sqlx::query_as::<_, ThreadInfo>("SELECT * FROM FILE_WORKSPACE")
-        .fetch_all(pool)
-        .await?;
-    Ok(work_space)
-}
-
-pub async fn list_by_status(pool: &SqlitePool, work_space_id: &str) -> Result<Vec<ThreadInfo>, DBError> {
-    let work_space = sqlx::query_as::<_, ThreadInfo>("SELECT * FROM FILE_WORKSPACE WHERE WORKSPACE = ?")
+pub async fn list_by_work_space(pool: &SqlitePool, work_space_id: &str) -> Result<Vec<ThreadInfo>, DBError> {
+    let work_space = sqlx::query_as::<_, ThreadInfo>("SELECT * FROM THREAD_INFO WHERE WORKSPACE = ?")
         .bind(work_space_id)
         .fetch_all(pool)
         .await?;
@@ -48,7 +41,7 @@ pub async fn list_by_status(pool: &SqlitePool, work_space_id: &str) -> Result<Ve
 
 pub async fn get(pool: &SqlitePool, id: i32) -> Result<ThreadInfo, DBError> {
     let work_sapce =
-        sqlx::query_as::<_, ThreadInfo>("SELECT * FROM FILE_WORKSPACE WHERE ID = ?")
+        sqlx::query_as::<_, ThreadInfo>("SELECT * FROM THREAD_INFO WHERE ID = ?")
             .bind(id)
             .fetch_one(pool)
             .await?;
@@ -56,7 +49,7 @@ pub async fn get(pool: &SqlitePool, id: i32) -> Result<ThreadInfo, DBError> {
 }
 
 pub async fn delete(pool: &SqlitePool, id: i32) -> Result<bool, DBError> {
-    let result = sqlx::query("DELETE * FROM FILE_WORKSPACE WHERE ID = ?")
+    let result = sqlx::query("DELETE * FROM THREAD_INFO WHERE ID = ?")
         .bind(id)
         .execute(pool)
         .await?;

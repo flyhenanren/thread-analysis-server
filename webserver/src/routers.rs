@@ -18,7 +18,7 @@ pub fn file_routes(cfg: &mut web::ServiceConfig) {
     )
     .service(
         web::scope("/dump")
-            .route("/list", web::get().to(list_dump_handler))
+            .route("/list/{work_space_id}", web::get().to(list_dump_handler))
             .route("/query", web::post().to(query_stack))
             .route("/count_dump", web::post().to(count_dumps_info))
             .route("/count_threads", web::post().to(count_threads_status))

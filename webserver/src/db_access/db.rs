@@ -28,26 +28,37 @@ pub struct FileWorkSpace {
 
 #[derive(Serialize, Debug, Clone, FromRow)]
 pub struct SourceFileInfo {
+    #[sqlx(rename = "ID")]
     pub id: String,
+    #[sqlx(rename = "WORKSPACE")]
     pub workspace: String,
+    #[sqlx(rename = "FILE_PATH")]
     pub file_path: String,
+    #[sqlx(rename = "FILE_TYPE")]
     pub file_type: i8,
+    #[sqlx(rename = "EXE_TIME")]
     pub exe_time: Option<NaiveDateTime>,
 }
 
 
 #[derive(Serialize, Debug, Clone, FromRow)]
 pub struct ThreadInfo {
+    #[sqlx(rename = "ID")]
     pub id: String,
+    #[sqlx(rename = "FILE_ID")]
     pub file_id: String,
+    #[sqlx(rename = "THREAD_ID")]
     pub thread_id: Option<String>,
+    #[sqlx(rename = "THREAD_NAME")]
     pub thread_name: String,
+    #[sqlx(rename = "DAEMON")]
     pub daemon: bool,
     pub prio: Option<u16>,
     pub os_prio: u32,
     pub tid: u64,
     pub nid: u64,
     pub address: Option<String>,
+    #[sqlx(rename = "THREAD_STATUS")]
     pub thread_status: i8,
 }
 

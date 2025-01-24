@@ -116,7 +116,7 @@ pub mod tests {
             println!("{}-开始构建：{}，共{}行", count_file, build_start.timestamp_millis(), lines.len());
             for group in lines {
                 if !Thread::is_sys_thread(&group) {
-                    let thread = Thread::new(&group);
+                    let thread = Thread::new(&group,0,0);
                     count_threads += 1;
                     match thread {
                         Ok(t) => threads.push(t),

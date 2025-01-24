@@ -20,11 +20,11 @@ pub async fn list(pool: &SqlitePool) -> Result<Vec<FileWorkSpace>, DBError> {
     Ok(work_space)
 }
 
-pub async fn get(pool: &SqlitePool, id: i32) -> Result<FileWorkSpace, DBError> {
+pub async fn get(pool: &SqlitePool, id: &str) -> Result<Option<FileWorkSpace>, DBError> {
     let work_sapce =
         sqlx::query_as::<_, FileWorkSpace>("SELECT * FROM FILE_WORKSPACE WHERE ID = ?")
             .bind(id)
-            .fetch_one(pool)
+            .fetch_optional(pool)
             .await?;
     Ok(work_sapce)
 }

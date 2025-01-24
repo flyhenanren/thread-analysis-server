@@ -34,6 +34,10 @@ rayon = "1.10.0"
 
 itertools="0.14.0"
 
+# 日志
+fern="0.7.1"
+log="0.4"
+
 # CPU核心数
 num_cpus = "1.16"
 

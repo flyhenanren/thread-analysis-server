@@ -19,6 +19,8 @@ pub struct Thread {
     pub status: ThreadStatus,
     pub address: Option<String>,
     pub frames: Vec<CallFrame>,
+    pub start: i128,
+    pub end: i128
 }
 lazy_static::lazy_static! {
     static ref REGEX_MAIN_INFO:Regex = Regex::new(
@@ -29,7 +31,7 @@ lazy_static::lazy_static! {
 }
 
 impl Thread {
-    pub fn new(lines: &Vec<String>) -> Result<Self, ThreadError> {
+    pub fn new(lines: &Vec<String>, start: i128, end: i128) -> Result<Self, ThreadError> {
         let (name, id, daemon, prio, os_prio, tid, nid, state, address) =
             Self::parse_thread_info(&lines[0])?;
         let status = match lines.len() == 1 {
@@ -64,7 +66,17 @@ impl Thread {
             status,
             frames,
             address,
+            start,
+            end
         })
+    }
+
+
+    pub fn set_start(&mut self, start: i128) {
+        self.start = start;
+    }
+    pub fn set_end(&mut self, end: i128) {
+        self.end = end;
     }
 
     pub fn is_sys_thread(lines: &Vec<String>) -> bool {
@@ -460,7 +472,7 @@ pub mod tests {
           "at com.example.MyClass.run(MyClass.java:5)".to_string(),
           "at java.lang.Thread.run(Thread.java:748)".to_string()
     ];
-        let result = Thread::new(&lines);
+        let result = Thread::new(&lines, 0,0);
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
@@ -492,6 +504,8 @@ pub mod tests {
             frames,
             address: Some("0x00007f3d80f21000".to_owned()),
             daemon: false,
+            start: 0,
+            end: 0
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -506,7 +520,7 @@ pub mod tests {
           "at com.example.MyClass.run(MyClass.java:15)".to_string(),
           "at java.lang.Thread.run(Thread.java:748)".to_string()     
         ];
-        let result = Thread::new(&lines);
+        let result = Thread::new(&lines,0,0);
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
@@ -547,6 +561,8 @@ pub mod tests {
             frames,
             daemon: false,
             address: Some("0x00007f3d80f22000".to_owned()),
+            start: 0,
+            end: 0
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -564,7 +580,7 @@ pub mod tests {
           "at com.example.MyClass.run(MyClass.java:25)".to_string(),
           "at java.lang.Thread.run(Thread.java:748)".to_string(),
         ];
-        let result = Thread::new(&lines);
+        let result = Thread::new(&lines,0,0);
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
@@ -625,6 +641,8 @@ pub mod tests {
             frames,
             daemon: false,
             address: Some("0x00007f3d80f23000".to_owned()),
+            start: 0,
+            end: 0
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -638,7 +656,7 @@ pub mod tests {
           "at com.example.MyClass.run(MyClass.java:35)".to_string(),
           "at java.lang.Thread.run(Thread.java:748)".to_string(),
         ];
-        let result = Thread::new(&lines);
+        let result = Thread::new(&lines,0,0);
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
@@ -676,6 +694,8 @@ pub mod tests {
             frames,
             daemon: false,
             address: Some("0x00007f3d80f24000".to_owned()),
+            start: 0,
+            end: 0
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -692,7 +712,7 @@ pub mod tests {
           "at com.example.MyClass.run(MyClass.java:55)".to_string(),
           "at java.lang.Thread.run(Thread.java:748)".to_string()
         ];
-        let result = Thread::new(&lines);
+        let result = Thread::new(&lines,0,0);
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
@@ -753,6 +773,8 @@ pub mod tests {
             frames,
             daemon: false,
             address: Some("0x00007f3d80f26000".to_owned()),
+            start: 0,
+            end: 0
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -770,7 +792,7 @@ pub mod tests {
           "at com.example.MyClass.run(MyClass.java:65)".to_string(),
           "at java.lang.Thread.run(Thread.java:748)".to_string(),
         ];
-        let result = Thread::new(&lines);
+        let result = Thread::new(&lines,0,0);
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
@@ -833,6 +855,8 @@ pub mod tests {
             frames,
             daemon: false,
             address: Some("0x00007f3d80f27000".to_owned()),
+            start: 0,
+            end: 0
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -850,7 +874,7 @@ pub mod tests {
           "at com.example.MyClass.run(MyClass.java:45)".to_string(),
           "at java.lang.Thread.run(Thread.java:748)".to_string()
         ];
-        let result = Thread::new(&lines);
+        let result = Thread::new(&lines,0,0);
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
@@ -913,6 +937,8 @@ pub mod tests {
             frames,
             daemon: false,
             address: Some("0x00007f3d80f25000".to_owned()),
+            start: 0,
+            end: 0
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -922,7 +948,7 @@ pub mod tests {
         let lines = vec![
           "\"GC task thread#0 (ParallelGC)\" os_prio=0 tid=0x0000ffff8c060800 nid=0xec316 runnable ".to_string(),
     ];
-        let result = Thread::new(&lines);
+        let result = Thread::new(&lines,0,0);
         let mut frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: None,
@@ -935,6 +961,8 @@ pub mod tests {
             frames,
             address: None,
             daemon: false,
+            start: 0,
+            end: 0
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -944,7 +972,7 @@ pub mod tests {
         let lines = vec![
             "\"VM Thread\" os_prio=0 tid=0x0000ffff8c132000 nid=0xec341 runnable ".to_string(),
         ];
-        let result = Thread::new(&lines);
+        let result = Thread::new(&lines,0,0);
         let mut frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: None,
@@ -957,6 +985,8 @@ pub mod tests {
             frames,
             address: None,
             daemon: false,
+            start: 0,
+            end: 0
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -966,7 +996,7 @@ pub mod tests {
         let lines = vec![
           "\"VM Periodic Task Thread\" os_prio=0 tid=0x0000ffff8c1ab000 nid=0xec358 waiting on condition ".to_string(),
     ];
-        let result = Thread::new(&lines);
+        let result = Thread::new(&lines,0,0);
         let mut frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: None,
@@ -979,6 +1009,8 @@ pub mod tests {
             frames,
             address: None,
             daemon: false,
+            start: 0,
+            end: 0
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -988,7 +1020,7 @@ pub mod tests {
         let lines = vec![
           "\"消息接收线程\" #206 prio=5 os_prio=0 tid=0x0000fffc052fa000 nid=0xed49b sleeping[0x0000fffea63fe000]".to_string(),
     ];
-        let result = Thread::new(&lines);
+        let result = Thread::new(&lines,0,0);
         let mut frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: Some("#206".into()),
@@ -1001,6 +1033,8 @@ pub mod tests {
             frames,
             address: Some("0x0000fffea63fe000".to_owned()),
             daemon: false,
+            start: 0,
+            end: 0
         };
         assert_eq!(result.unwrap(), thread)
     }
@@ -1009,7 +1043,7 @@ pub mod tests {
         let lines = vec![
           "\"lettuce-timer-3-1\" #63 daemon prio=5 os_prio=0 tid=0x0000fffd7ac8e000 nid=0xec9e9 sleeping[0x0000ffff075fe000]".to_string(),
     ];
-        let result = Thread::new(&lines);
+        let result = Thread::new(&lines,0,0);
         let mut frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: Some("#63".into()),
@@ -1022,6 +1056,8 @@ pub mod tests {
             frames,
             address: Some("0x0000ffff075fe000".to_owned()),
             daemon: true,
+            start: 0,
+            end: 0
         };
         assert_eq!(result.unwrap(), thread)
     }

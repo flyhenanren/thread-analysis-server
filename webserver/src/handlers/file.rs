@@ -1,4 +1,5 @@
 use actix_web::{web, HttpResponse};
+use log::info;
 use crate::{error::AnalysisError, models::resp::ApiResponse, service::file_service, state::AppState};
 
 pub async fn load_file_handler(
@@ -7,8 +8,6 @@ pub async fn load_file_handler(
 ) -> Result<HttpResponse, AnalysisError>  {
     match file_service::exist_work_space(&app_state.pool, &path).await {
         Ok(exist) => {
-            let mut state_path = app_state.path.lock().unwrap();
-            *state_path = path.clone();
             match exist {
                 true => Ok(HttpResponse::Ok().json(ApiResponse::ok())),
                 false => {
