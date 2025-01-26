@@ -31,8 +31,7 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
                 .unwrap_or_else(|e| panic!("读取文件时发生错误：{}", e))
         }
         _ => {
-            let unzip_path: &Path = source_path.parent().expect("获取压缩包的上级路径错误");
-            work_space = FileWorkSpace::new(unzip_path.to_str().unwrap());
+            work_space = FileWorkSpace::new(path);
             db_worksapce::add(pool, &work_space).await?;
             file_utils::unzip_and_extract_file(source_path, &work_space.id)
                 .unwrap_or_else(|e| panic!("读取文件时发生错误：{}", e))
@@ -145,6 +144,7 @@ pub async fn list_dump_file(pool: &SqlitePool, work_space_id: &str) -> Result<Ve
             for file in fils {
                 if let Some(thread_status_list ) = infos.get(&file.id) {
                     let mut dump_info = StackDumpInfo {
+                        file_id: file.id.clone(),
                         file_name: file.file_path.clone(),
                         time: file.exe_time.unwrap_or_else(|| chrono::NaiveDateTime::from_timestamp_opt(0, 0).unwrap()),
                         run_threads:0,
@@ -164,7 +164,7 @@ pub async fn list_dump_file(pool: &SqlitePool, work_space_id: &str) -> Result<Ve
                     result.push(dump_info);
                 }
             }
-            return Ok(vec![])
+            return Ok(result);
         },
         None => Ok(vec![])
     }
@@ -176,6 +176,16 @@ pub async fn exist_work_space(pool: &SqlitePool, path: &str) -> Result<bool, Ana
 
 pub async fn list_work_space(pool: &SqlitePool) -> Result<Vec<FileWorkSpace>, AnalysisError> {
     Ok(db_worksapce::list(pool).await?)
+}
+
+pub async fn clean_work_space(pool: &SqlitePool) -> Result<bool, AnalysisError>{
+    db_worksapce::delete_all(pool).await?;
+    db_file::delete_all(pool).await?;
+    db_memeory::delete_all(pool).await?;
+    db_cpu::delete_all(pool).await?;
+    db_thread::delete_all(pool).await?;
+    db_stack::delete_all(pool).await?;
+    Ok(true)
 }
 
 #[cfg(test)]

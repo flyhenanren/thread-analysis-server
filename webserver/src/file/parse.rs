@@ -1,5 +1,6 @@
 use chrono::{Duration, NaiveDateTime, Utc};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use log::info;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
 use std::collections::HashMap;
@@ -110,9 +111,10 @@ impl ParseFile<HashMap<String, Vec<Thread>>, FileInfo> for ThreadParser {
             let mut thread_lines: Vec<Vec<String>> = Vec::new();
             let mut current_group: Vec<String> = Vec::new();
             let mut start = false;
-            let mut line_number:i128 = 0;
-            let mut line_tag:Vec<i128> = Vec::new();
+            let mut line_number:i64 = 0;
+            let mut line_tag:Vec<(i64, i64)> = Vec::new();
             for line in reader.lines() {
+                line_number+=1;
                 match line {
                     Ok(line) => {
                         if line.is_empty() {
@@ -121,8 +123,11 @@ impl ParseFile<HashMap<String, Vec<Thread>>, FileInfo> for ThreadParser {
                         }
                         if line.contains("nid=") {
                             start = true;
+                            if let Some((last)) = line_tag.last_mut(){
+                                last.1 = line_number - 2;
+                            }
+                            line_tag.push((line_number, line_number));
                             if !current_group.is_empty() {
-                                line_tag.push(line_number);
                                 thread_lines.push(current_group);
                                 current_group = Vec::new();
                             }
@@ -133,32 +138,25 @@ impl ParseFile<HashMap<String, Vec<Thread>>, FileInfo> for ThreadParser {
                     }
                     Err(_) => {}
                 }
-                line_number += 1;
             }
             if !current_group.is_empty() {
-                line_tag.push(line_number);
+                if let Some(last) = line_tag.last_mut() {
+                    last.1 = line_number - 2;
+                }
                 thread_lines.push(current_group);
             }
-            let mut count_thread = 0;
             let file_thread_info: Vec<Thread> = thread_lines
                 .par_iter()
-                .filter_map(|group| {
-                    let start_line = match count_thread {
-                        0 => 0,
-                        _ => line_tag[count_thread],
-                    };
-                    let end_line = match count_thread {
-                        0 => line_tag[count_thread],
-                        _ => line_tag[count_thread - 1],
-                    };
-                    match Thread::new(group,start_line, end_line) {
+                .enumerate()
+                .filter_map(|(idx, group)| {
+                    match Thread::new(group,line_tag[idx].0, line_tag[idx].1) {
                         Ok(thread) => Some(thread),
                         Err(err) => {
                             eprintln!("解析线程失败: {:?}", err); // 打印或记录错误
                             None // 失败时返回 None
                         }
                     }
-            
+                    
                 })
                 .collect();
             if !file_thread_info.is_empty() {

@@ -25,20 +25,20 @@ pub async fn query_stack(
         .map_err(|err| AnalysisError::DBError(format!("对象转换错误:{}", err)))
 }
 
-pub async fn count_dumps_info(
-    app_state: web::Data<AppState>,
-    path: web::Json<String>,
-    count_query: web::Json<StatusQuery>
-) -> Result<HttpResponse, AnalysisError> {
-    thread_dump::count_dumps_info(&path.clone(), &count_query)
-    .map(|thread_count|  HttpResponse::Ok().json(ApiResponse::success(Some(thread_count))))
-    .map_err(|err|  AnalysisError::DBError(format!("对象转换错误:{}", err)))
+
+pub async fn count_file_status(app_state: web::Data<AppState>,
+    count_query: web::Json<StatusQuery>) -> Result<HttpResponse, AnalysisError> {
+        match thread_dump::count_status_by_file(&app_state.pool, &count_query).await {
+            Ok(status_counts) => Ok(HttpResponse::Ok().json(ApiResponse::success(Some(status_counts)))),
+            Err(err) => Err(AnalysisError::DBError(format!("对象转换错误:{}", err))),
+        }
 }
 
-pub async fn count_threads_status(app_state: web::Data<AppState>,
-    path: web::Json<String>,
+
+pub async fn count_thread_status(app_state: web::Data<AppState>,
     count_query: web::Json<StatusQuery>) -> Result<HttpResponse, AnalysisError> {
-        thread_dump::count_threads_info(&path.clone(), &count_query)
-        .map(|thread_count|  HttpResponse::Ok().json(ApiResponse::success(Some(thread_count))))
-        .map_err(|err|  AnalysisError::DBError(format!("对象转换错误:{}", err)))
+        match thread_dump::count_status_by_thread(&app_state.pool, &count_query).await {
+            Ok(status_counts) => Ok(HttpResponse::Ok().json(ApiResponse::success(Some(status_counts)))),
+            Err(err) => Err(AnalysisError::DBError(format!("对象转换错误:{}", err))),
+        }
 }

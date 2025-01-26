@@ -5,7 +5,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-use crate::error::{FrameError, ThreadError};
+use crate::{error::{FrameError, ThreadError}};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Thread {
@@ -14,13 +14,13 @@ pub struct Thread {
     pub daemon: bool,
     pub prio: Option<u16>,
     pub os_prio: u32,
-    pub tid: u64,
-    pub nid: u64,
+    pub tid: String,
+    pub nid: String,
     pub status: ThreadStatus,
     pub address: Option<String>,
     pub frames: Vec<CallFrame>,
-    pub start: i128,
-    pub end: i128
+    pub start: i64,
+    pub end: i64
 }
 lazy_static::lazy_static! {
     static ref REGEX_MAIN_INFO:Regex = Regex::new(
@@ -31,7 +31,7 @@ lazy_static::lazy_static! {
 }
 
 impl Thread {
-    pub fn new(lines: &Vec<String>, start: i128, end: i128) -> Result<Self, ThreadError> {
+    pub fn new(lines: &Vec<String>, start: i64, end: i64) -> Result<Self, ThreadError> {
         let (name, id, daemon, prio, os_prio, tid, nid, state, address) =
             Self::parse_thread_info(&lines[0])?;
         let status = match lines.len() == 1 {
@@ -72,10 +72,10 @@ impl Thread {
     }
 
 
-    pub fn set_start(&mut self, start: i128) {
+    pub fn set_start(&mut self, start: i64) {
         self.start = start;
     }
-    pub fn set_end(&mut self, end: i128) {
+    pub fn set_end(&mut self, end: i64) {
         self.end = end;
     }
 
@@ -101,8 +101,8 @@ impl Thread {
             bool,
             Option<u16>,
             u32,
-            u64,
-            u64,
+            String,
+            String,
             String,
             Option<String>,
         ),
@@ -136,20 +136,14 @@ impl Thread {
                         .map_err(ThreadError::ParseIntError)
                 })
                 .transpose()?;
-            let tid_str = caps
+            let tid = caps
                 .name("tid")
                 .ok_or(ThreadError::MissingField("tid".into()))?
-                .as_str()
-                .strip_prefix("0x")
-                .ok_or(ThreadError::InvalidStatus)?;
-            let tid = u64::from_str_radix(tid_str, 16).map_err(ThreadError::ParseIntError)?;
-            let nid_str = caps
+                .as_str().to_owned();
+            let nid = caps
                 .name("nid")
                 .ok_or(ThreadError::MissingField("nid".into()))?
-                .as_str()
-                .strip_prefix("0x")
-                .ok_or(ThreadError::InvalidStatus)?;
-            let nid = u64::from_str_radix(nid_str, 16).map_err(ThreadError::ParseIntError)?;
+                .as_str().to_owned();
             let state = caps
                 .name("state")
                 .ok_or(ThreadError::MissingField("state".into()))?
@@ -377,6 +371,7 @@ pub enum MonitorAction {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StackDumpInfo {
+    pub file_id: String,
     pub file_name: String,
     pub time: NaiveDateTime,
     pub run_threads: i32,
@@ -385,8 +380,9 @@ pub struct StackDumpInfo {
 }
 
 impl StackDumpInfo {
-    pub fn new(file_name: &str, time: &NaiveDateTime, threads: i32) -> Self {
+    pub fn new(file_id: &str, file_name: &str, time: &NaiveDateTime, threads: i32) -> Self {
         StackDumpInfo {
+            file_id: file_id.into(),
             file_name: file_name.into(),
             time: time.clone(),
             run_threads: 0,
@@ -407,6 +403,7 @@ impl StackDumpInfo {
 impl From<web::Json<StackDumpInfo>> for StackDumpInfo {
     fn from(dump_file: web::Json<StackDumpInfo>) -> Self {
         StackDumpInfo {
+            file_id: dump_file.file_id.clone(),
             file_name: dump_file.file_name.clone(),
             time: dump_file.time.clone(),
             run_threads: dump_file.run_threads,
@@ -498,8 +495,8 @@ pub mod tests {
             name: "Thread-1".to_string(),
             prio: Some(5),
             os_prio: 0,
-            tid: 0x00007f3d70001800,
-            nid: 0x2f03,
+            tid: "0x00007f3d70001800".to_owned(),
+            nid: "0x2f03".to_owned(),
             status: ThreadStatus::Runnable,
             frames,
             address: Some("0x00007f3d80f21000".to_owned()),
@@ -555,8 +552,8 @@ pub mod tests {
             name: "Thread-2".to_string(),
             prio: Some(5),
             os_prio: 0,
-            tid: 0x00007f3d70002800,
-            nid: 0x2f04,
+            tid: "0x00007f3d70002800".to_owned(),
+            nid: "0x2f04".to_owned(),
             status: ThreadStatus::Blocked,
             frames,
             daemon: false,
@@ -635,8 +632,8 @@ pub mod tests {
             name: "Thread-3".to_string(),
             prio: Some(5),
             os_prio: 0,
-            tid: 0x00007f3d70003800,
-            nid: 0x2f05,
+            tid: "0x00007f3d70003800".to_owned(),
+            nid: "0x2f05".to_owned(),
             status: ThreadStatus::Waiting,
             frames,
             daemon: false,
@@ -688,8 +685,8 @@ pub mod tests {
             name: "Thread-4".to_string(),
             prio: Some(5),
             os_prio: 0,
-            tid: 0x00007f3d70004800,
-            nid: 0x2f06,
+            tid: "0x00007f3d70004800".to_owned(),
+            nid: "0x2f06".to_owned(),
             status: ThreadStatus::TimedWaiting,
             frames,
             daemon: false,
@@ -767,8 +764,8 @@ pub mod tests {
             name: "Thread-7".to_string(),
             prio: Some(5),
             os_prio: 0,
-            tid: 0x00007f3d70007800,
-            nid: 0x2f09,
+            tid: "0x00007f3d70007800".to_owned(),
+            nid: "0x2f09".to_owned(),
             status: ThreadStatus::TimedWaiting,
             frames,
             daemon: false,
@@ -849,8 +846,8 @@ pub mod tests {
             name: "Thread-8".to_string(),
             prio: Some(5),
             os_prio: 0,
-            tid: 0x00007f3d70008800,
-            nid: 0x2f0a,
+            tid: "0x00007f3d70008800".to_owned(),
+            nid: "0x2f0a".to_owned(),
             status: ThreadStatus::TimedWaiting,
             frames,
             daemon: false,
@@ -931,8 +928,8 @@ pub mod tests {
             name: "Thread-6".to_string(),
             prio: Some(5),
             os_prio: 0,
-            tid: 0x00007f3d70006800,
-            nid: 0x2f08,
+            tid: "0x00007f3d70006800".to_owned(),
+            nid: "0x2f08".to_owned(),
             status: ThreadStatus::Waiting,
             frames,
             daemon: false,
@@ -955,8 +952,8 @@ pub mod tests {
             name: "GC task thread#0 (ParallelGC)".to_string(),
             prio: None,
             os_prio: 0,
-            tid: 0x0000ffff8c060800,
-            nid: 0xec316,
+            tid: "0x0000ffff8c060800".to_owned(),
+            nid: "0xec316".to_owned(),
             status: ThreadStatus::Runnable,
             frames,
             address: None,
@@ -979,8 +976,8 @@ pub mod tests {
             name: "VM Thread".to_string(),
             prio: None,
             os_prio: 0,
-            tid: 0x0000ffff8c132000,
-            nid: 0xec341,
+            tid: "0x0000ffff8c132000".to_owned(),
+            nid: "0xec341".to_owned(),
             status: ThreadStatus::Runnable,
             frames,
             address: None,
@@ -1003,8 +1000,8 @@ pub mod tests {
             name: "VM Periodic Task Thread".to_string(),
             prio: None,
             os_prio: 0,
-            tid: 0x0000ffff8c1ab000,
-            nid: 0xec358,
+            tid: "0x0000ffff8c1ab000".to_owned(),
+            nid: "0xec358".to_owned(),
             status: ThreadStatus::Waiting,
             frames,
             address: None,
@@ -1027,8 +1024,8 @@ pub mod tests {
             name: "消息接收线程".to_string(),
             prio: Some(5),
             os_prio: 0,
-            tid: 0x0000fffc052fa000,
-            nid: 0xed49b,
+            tid: "0x0000fffc052fa000".to_owned(),
+            nid: "0xed49b".to_owned(),
             status: ThreadStatus::TimedWaiting,
             frames,
             address: Some("0x0000fffea63fe000".to_owned()),
@@ -1050,8 +1047,8 @@ pub mod tests {
             name: "lettuce-timer-3-1".to_string(),
             prio: Some(5),
             os_prio: 0,
-            tid: 0x0000fffd7ac8e000,
-            nid: 0xec9e9,
+            tid: "0x0000fffd7ac8e000".to_owned(),
+            nid: "0xec9e9".to_owned(),
             status: ThreadStatus::TimedWaiting,
             frames,
             address: Some("0x0000ffff075fe000".to_owned()),

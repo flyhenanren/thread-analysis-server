@@ -46,6 +46,12 @@ pub async fn delete(pool: &SqlitePool, id: i32) -> Result<(), DBError> {
     Ok(())
 }
 
+pub async fn delete_all(pool: &SqlitePool) -> Result<(), DBError> {
+    sqlx::query("DELETE * FROM FILE_WORKSPACE")
+        .execute(pool)
+        .await?;
+    Ok(())
+}
 pub async fn update_time(pool: &SqlitePool, id: i32, time:NaiveDateTime) -> Result<(), DBError> {
     sqlx::query("UPDATE FILE_WORKSPACE SET update_time = $1 WHERE ID = $2")
         .bind(time)

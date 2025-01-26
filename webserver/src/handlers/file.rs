@@ -29,3 +29,12 @@ pub async fn list_work_space(
         Err(err) => Err(AnalysisError::ActixError(format!("工作空间查询异常：{}",err))),
     }
 }
+
+pub async fn clean_open_file(
+    app_state: web::Data<AppState>
+) -> Result<HttpResponse, AnalysisError>  {
+    match file_service::clean_work_space(&app_state.pool).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(ApiResponse::ok())),
+        Err(err) => Err(AnalysisError::ActixError(format!("清理工作空间异常：{}", err))),
+    }
+}

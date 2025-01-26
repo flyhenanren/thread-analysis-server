@@ -3,6 +3,8 @@ use std::{fs, io};
 use std::io::{copy, Error, Read};
 use std::path::{Path, PathBuf};
 
+use log::info;
+
 use crate::models::file_info::FileInfo;
 
 /// 从文件夹或者压缩包中提取信息
@@ -27,14 +29,19 @@ pub fn unzip_and_extract_file(source: &Path, work_space: &str) -> io::Result<Vec
                     }
                 } else {
                     let file_path = target.join(file_name);
+                    let mut exist  = false;
                     match if file_path.exists() {
+                        exist = true;
                         fs::File::open(&file_path)
                     } else {
+                        exist = false;
                         fs::File::create(&file_path)
                     } {
                         Ok(mut target_file) => {
-                            if let Err(e) = copy(&mut file, &mut target_file) {
-                                eprintln!("Failed to copy file to {:?}: {}", file_path, e);
+                            if !exist {
+                                if let Err(e) = copy(&mut file, &mut target_file) {
+                                    eprintln!("Failed to copy file to {:?}: {}", file_path, e);
+                                }    
                             }
                             file_mapping.push(FileInfo::new(&file_path, work_space));
                         }

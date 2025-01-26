@@ -1,7 +1,7 @@
 use chrono::Utc;
 use sqlx::{SqlitePool, Transaction};
 
-use crate::{error::DBError, ThreadInfo};
+use crate::{error::DBError, models::thread::StatusQuery, StatusInfo, ThreadInfo};
 
 pub async fn batch_add(pool: &SqlitePool, thread_infos: Vec<ThreadInfo>, work_space: &str) -> Result<(), DBError> {
     let start = Utc::now().timestamp_millis();
@@ -13,7 +13,9 @@ pub async fn batch_add(pool: &SqlitePool, thread_infos: Vec<ThreadInfo>, work_sp
 
         // 构建批量插入的 SQL 语句
         let insert_query = String::from(
-            r#"INSERT INTO THREAD_INFO (ID, WORKSPACE, FILE_ID, THREAD_ID, THREAD_NAME, DAEMON, THREAD_STATUS) VALUES (?, ?, ?, ?, ?, ?, ?)"#
+            r#"INSERT INTO THREAD_INFO 
+            (ID, WORKSPACE, FILE_ID, THREAD_ID, THREAD_NAME, DAEMON, PRIO, OS_PRIO, TID, NID, ADDRESS,THREAD_STATUS, START_LINE, END_LINE) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#
         );
         for thread_info in chunk.iter(){
             sqlx::query(&insert_query)
@@ -23,7 +25,14 @@ pub async fn batch_add(pool: &SqlitePool, thread_infos: Vec<ThreadInfo>, work_sp
             .bind(thread_info.thread_id.clone().unwrap_or_default())
             .bind(thread_info.thread_name.to_owned())
             .bind(thread_info.daemon)
+            .bind(thread_info.prio)
+            .bind(thread_info.os_prio)
+            .bind(thread_info.tid.clone())
+            .bind(thread_info.nid.clone())
+            .bind(thread_info.address.clone())
             .bind(thread_info.thread_status)
+            .bind(thread_info.start_line)
+            .bind(thread_info.end_line)
             .execute(&mut *transaction).await?;
         }
         transaction.commit().await?;
@@ -57,3 +66,19 @@ pub async fn delete(pool: &SqlitePool, id: i32) -> Result<bool, DBError> {
 }
 
 
+pub async fn delete_all(pool: &SqlitePool) -> Result<bool, DBError> {
+    let result = sqlx::query("DELETE * FROM THREAD_INFO")
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+pub async fn count_threads_status(pool: &SqlitePool, status: &StatusQuery) -> Result<Vec<StatusInfo>, DBError> {
+    let result = sqlx::query_as::<_, StatusInfo>(r#"select f.FILE_PATH, t.* from THREAD_INFO t
+                                left join file_info f
+                                on t.FILE_ID == f.id
+                                order by f.EXE_TIME asc"#)
+    .fetch_all(pool)
+    .await?;
+    Ok(result)
+}
