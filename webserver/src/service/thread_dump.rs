@@ -1,17 +1,19 @@
 use std::collections::HashMap;
-
-use actix_web::cookie::time::ext;
-use regex::Regex;
 use sqlx::SqlitePool;
 
 use crate::{
-    db_access::db_thread, error::AnalysisError, handlers::thread, models::thread::{PoolThreads, StatusCount, StatusQuery, Thread}
+    db_access::db_thread, error::AnalysisError,  models::thread::{PoolThreads, StatusCount, StatusQuery, ThreadDetail, ThreadsQuery}
 };
 
 
 /// 获取线程详情
-pub fn get_thread_detail(path: &str, file_name: &str) -> Result<Vec<Thread>, AnalysisError> {
-    Ok(vec![])
+pub async fn get_thread_detail(pool: &SqlitePool, threads_query: &ThreadsQuery) -> Result<Vec<ThreadDetail>, AnalysisError> {
+    match db_thread::list_threads(pool, &threads_query.file_id, &threads_query.thread_ids).await{
+        Ok(thread_info) => {
+            return Ok(thread_info.iter().map(|thread| ThreadDetail::new(thread)).collect());
+        },
+        Err(err) => Err(AnalysisError::DBError(format!("查询线程详情错误:{}", err))),
+    }
 }
 
 
@@ -63,10 +65,9 @@ pub async fn count_status_by_file(
     pool: &SqlitePool,
     file_id: &str,
 ) -> Result<Vec<PoolThreads>, AnalysisError> {
-    match db_thread::list_threads_by_file(pool, file_id).await{
+    match db_thread::list_threads(pool, file_id, &None).await{
         Ok(threads_info) => {
             let mut pool_map: HashMap<String, PoolThreads> = HashMap::new();
-            let total_count = threads_info.len() as f64; // 转换为 f64 进行计算
             for thread in &threads_info{
                 let prefix = extract_prefix(&thread.thread_name);
                 let entry = pool_map.entry(prefix.clone()).or_insert(PoolThreads{
@@ -76,8 +77,10 @@ pub async fn count_status_by_file(
                     runnable: 0,
                     waitting: 0,
                     time_waitting: 0,
-                    block: 0
+                    block: 0,
+                    thread_ids: vec![]
                 });
+                entry.thread_ids.push(thread.id.clone());
                 entry.count += 1;
                 match thread.thread_status{
                     1 => entry.runnable += 1,

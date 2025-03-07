@@ -69,6 +69,8 @@ pub struct ThreadInfo {
     pub start_line: i64,
     #[sqlx(rename = "END_LINE")]
     pub end_line: i64,
+    #[sqlx(rename = "METHOD_NAME")]
+    pub method_name: String,
 }
 
 
@@ -89,7 +91,7 @@ pub struct ThreadStack {
     pub thread_id: String,
     pub class_name: String,
     pub method_name: Option<String>,
-    pub stack_lin: Option<u32>,
+    pub method_lin: Option<u32>,
     pub stack_status: String,
 }
 
@@ -183,7 +185,7 @@ impl ThreadStack{
                 thread_id: thread_id.into(),
                 class_name: frame.class_name,
                 method_name: frame.method_name,
-                stack_lin: frame.line_number,
+                method_lin: frame.line_number,
                 stack_status: to_string(&frame.frame).unwrap(),
             }
         })
@@ -207,7 +209,7 @@ impl ThreadInfo{
         ThreadInfo {
             id: utils::rand_id(),
             file_id: file_id.into(),
-            thread_id: Some(utils::rand_id()),
+            thread_id: thread.id.clone(),
             thread_name: thread.name.clone(),
             daemon: thread.daemon,
             prio: thread.prio.clone(),
@@ -218,6 +220,7 @@ impl ThreadInfo{
             thread_status: thread.status.clone().into(),
             start_line: thread.start,
             end_line: thread.end,
+            method_name: thread.frames.first().and_then(|frame| frame.method_name.clone()).unwrap_or_default(),
         }
     }
 }

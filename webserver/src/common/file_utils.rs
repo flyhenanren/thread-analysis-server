@@ -1,9 +1,8 @@
 use std::fs::File;
 use std::{fs, io};
 use std::io::{copy, Error, Read};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use log::info;
 
 use crate::models::file_info::FileInfo;
 

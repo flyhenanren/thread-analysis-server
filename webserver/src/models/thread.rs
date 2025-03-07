@@ -5,7 +5,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-use crate::{error::{FrameError, ThreadError}};
+use crate::{db_access::db::ThreadInfo, error::{FrameError, ThreadError}};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Thread {
@@ -444,6 +444,7 @@ pub struct PoolThreads {
     pub waitting: usize,
     pub time_waitting: usize,
     pub block: usize,
+    pub thread_ids: Vec<String>
 }
 
 impl From<web::Json<PoolThreads>> for PoolThreads {
@@ -455,10 +456,12 @@ impl From<web::Json<PoolThreads>> for PoolThreads {
             runnable: thread_count.runnable,
             waitting: thread_count.waitting,
             time_waitting: thread_count.time_waitting,
-            block: thread_count.block
+            block: thread_count.block,
+            thread_ids: thread_count.thread_ids.clone()
         }
     }
 }
+
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct StatusQuery {
@@ -475,6 +478,57 @@ impl From<web::Json<StatusQuery>> for StatusQuery {
             total: count_query.total,
             exclude: count_query.exclude.clone(),
             status: count_query.status.clone(),
+        }
+    }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ThreadsQuery {
+    pub file_id: String,
+    pub thread_ids: Option<Vec<String>>
+}
+
+impl From<web::Json<ThreadsQuery>> for ThreadsQuery {
+    fn from(count_query: web::Json<ThreadsQuery>) -> Self {
+        ThreadsQuery {
+            file_id: count_query.file_id.clone(),
+            thread_ids: count_query.thread_ids.clone(),
+        }
+    }
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct ThreadDetail {
+    pub id: String,
+    pub name: String,
+    pub status: ThreadStatus,
+    pub nid: String,
+    pub method: String,
+    pub stack_dep: i64,
+}
+
+impl From<web::Json<ThreadDetail>> for ThreadDetail {
+    fn from(detail: web::Json<ThreadDetail>) -> Self {
+        ThreadDetail {
+            id: detail.id.clone(),
+            name: detail.name.clone(),
+            status: detail.status.clone(),
+            nid: detail.nid.clone(),
+            method: detail.method.clone(),
+            stack_dep: detail.stack_dep,
+        }
+    }
+}
+
+impl ThreadDetail {
+    pub fn new(info: &ThreadInfo) -> Self {
+        ThreadDetail {
+            id: info.id.clone(),
+            name: info.thread_name.clone(),
+            status: ThreadStatus::try_from(info.thread_status).unwrap(),
+            nid: info.nid.clone(),
+            method: info.method_name.clone(),
+            stack_dep: info.end_line - info.start_line + 1,
         }
     }
 }

@@ -1,6 +1,4 @@
-use std::path;
-
-use crate::{error::AnalysisError, models::{resp::ApiResponse, thread::StatusQuery}, service::{file_service, thread_dump}, state::AppState};
+use crate::{error::AnalysisError, models::{resp::ApiResponse, thread::{StatusQuery, ThreadsQuery}}, service::{file_service, thread_dump}, state::AppState};
 use actix_web::{web, HttpResponse};
 
 pub async fn list_dump_handler(
@@ -11,16 +9,15 @@ pub async fn list_dump_handler(
     Ok(HttpResponse::Ok().json(ApiResponse::success(Some(files))))
 }
 
-pub async fn query_stack(
+pub async fn query_threads(
     app_state: web::Data<AppState>,
-    path: web::Json<String>,
-    file_name: String,
+    query_info: web::Json<ThreadsQuery>,
 ) -> Result<HttpResponse, AnalysisError> {
     // 读取索引并处理
-    thread_dump::get_thread_detail(&path.clone(), &file_name)
-        .map(|stack_data| {
+    thread_dump::get_thread_detail(&app_state.pool, &query_info).await
+        .map(|threads_data| {
             // 返回成功的 HttpResponse
-            HttpResponse::Ok().json(ApiResponse::success(Some(stack_data)))
+            HttpResponse::Ok().json(ApiResponse::success(Some(threads_data)))
         })
         .map_err(|err| AnalysisError::DBError(format!("对象转换错误:{}", err)))
 }

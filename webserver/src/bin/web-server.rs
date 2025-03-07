@@ -2,9 +2,8 @@ use actix_web::{web, App, HttpServer};
 use db_access::db::*;
 use fern::Dispatch;
 use std::io;
-use std::sync::Mutex;
 use dotenv::dotenv;
-use log::{info, warn, error};
+use log::info;
 
 #[path = "../handlers/mod.rs"]
 mod handlers;

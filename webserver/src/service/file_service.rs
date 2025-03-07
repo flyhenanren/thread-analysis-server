@@ -86,10 +86,11 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
         .into_par_iter()
         .flat_map(|(key, value)| {
             value.into_par_iter().map(move |thread| {
+                let thread_info = ThreadInfo::new(&thread, &key);
                 // 先将 ThreadStack 创建并收集
-                let stack = ThreadStack::new(&thread, &key, &work_space_id);
+                let stack = ThreadStack::new(&thread, &thread_info.id, &work_space_id);
                 // 收集完所有的 stack_info，返回值包含 thread_info 和 stack
-                (ThreadInfo::new(&thread, &key), stack)
+                (thread_info, stack)
             })
         })
         .collect::<Vec<(ThreadInfo, Vec<ThreadStack>)>>();

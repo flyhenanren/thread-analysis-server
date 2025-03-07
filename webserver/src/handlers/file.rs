@@ -1,5 +1,4 @@
 use actix_web::{web, HttpResponse};
-use log::info;
 use crate::{error::AnalysisError, models::resp::ApiResponse, service::file_service, state::AppState};
 
 pub async fn load_file_handler(

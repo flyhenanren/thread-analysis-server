@@ -2,7 +2,6 @@ use futures::future::join_all; // 在文件顶部添加这个导入
 
 use std::sync::Arc;
 
-use chrono::Utc;
 use sqlx::{SqlitePool, Transaction};
 use tokio::sync::mpsc::{self, Sender, Receiver};
 
@@ -79,7 +78,7 @@ where
 fn execute_batch_add(pool: Arc<SqlitePool>, threads: Vec<ThreadStack>) -> tokio::task::JoinHandle<Result<(), DBError>> {
     tokio::spawn(async move {
         let mut transaction: Transaction<'_, sqlx::Sqlite> = pool.begin().await?;
-        let insert_sql = String::from(r#"INSERT INTO THREAD_STACK (ID, WORKSPACE, THREAD_ID, CLASS_NAME, METHOD_NAME, STACK_LINE, STACK_STATUS)
+        let insert_sql = String::from(r#"INSERT INTO THREAD_STACK (ID, WORKSPACE, THREAD_ID, CLASS_NAME, METHOD_NAME, METHOD_LINE, STACK_STATUS)
             VALUES (?,?,?,?,?,?,?)"#);
         for stack in threads {
             sqlx::query(&insert_sql)
@@ -88,7 +87,7 @@ fn execute_batch_add(pool: Arc<SqlitePool>, threads: Vec<ThreadStack>) -> tokio:
             .bind(stack.thread_id.clone())
             .bind(stack.class_name.clone())
             .bind(stack.method_name.clone())
-            .bind(stack.stack_lin)
+            .bind(stack.method_lin)
             .bind(stack.stack_status.clone())
             .execute(&mut *transaction)
             .await?;
