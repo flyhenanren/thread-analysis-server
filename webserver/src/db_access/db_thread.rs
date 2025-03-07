@@ -82,3 +82,26 @@ pub async fn count_threads_status(pool: &SqlitePool, status: &StatusQuery) -> Re
     .await?;
     Ok(result)
 }
+
+
+pub async fn count_threads_status_by_file(pool: &SqlitePool, file_id: &str) -> Result<Vec<StatusInfo>, DBError> {
+    let result = sqlx::query_as::<_, StatusInfo>(r#"select f.FILE_PATH, t.* from THREAD_INFO t
+                                left join file_info f
+                                on t.FILE_ID == f.id
+                                where f.ID = ?
+                                order by f.EXE_TIME asc"#)
+                                .bind(file_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(result)
+}
+
+
+pub async fn list_threads_by_file(pool: &SqlitePool, file_id: &str) -> Result<Vec<ThreadInfo>, DBError> {
+    let result = sqlx::query_as::<_, ThreadInfo>(r#"select * from THREAD_INFO 
+                                where file_id = ?"#)
+                                .bind(file_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(result)
+}

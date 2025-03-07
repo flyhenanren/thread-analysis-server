@@ -23,6 +23,6 @@ pub fn file_routes(cfg: &mut web::ServiceConfig) {
             .route("/query", web::post().to(query_stack))
             .route("/count_file_status", web::post().to(count_file_status))
             .route("/count_thread_status", web::post().to(count_thread_status))
-            
+            .route("/list_thread_pool/{file_id}", web::get().to(count_file_threads))
     );
 }

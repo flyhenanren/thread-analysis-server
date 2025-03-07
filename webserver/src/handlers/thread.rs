@@ -25,10 +25,23 @@ pub async fn query_stack(
         .map_err(|err| AnalysisError::DBError(format!("对象转换错误:{}", err)))
 }
 
+pub async fn count_file_threads(
+    app_state: web::Data<AppState>,
+    file_id: web::Path<String>,
+) -> Result<HttpResponse, AnalysisError> {
+  
+    thread_dump::count_status_by_file(&app_state.pool, &file_id).await
+        .map(|stack_data| {
+            // 返回成功的 HttpResponse
+            HttpResponse::Ok().json(ApiResponse::success(Some(stack_data)))
+        })
+        .map_err(|err| AnalysisError::DBError(format!("对象转换错误:{}", err)))
+}
+
 
 pub async fn count_file_status(app_state: web::Data<AppState>,
     count_query: web::Json<StatusQuery>) -> Result<HttpResponse, AnalysisError> {
-        match thread_dump::count_status_by_file(&app_state.pool, &count_query).await {
+        match thread_dump::count_status_by_files(&app_state.pool, &count_query).await {
             Ok(status_counts) => Ok(HttpResponse::Ok().json(ApiResponse::success(Some(status_counts)))),
             Err(err) => Err(AnalysisError::DBError(format!("对象转换错误:{}", err))),
         }

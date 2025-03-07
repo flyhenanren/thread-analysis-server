@@ -434,6 +434,32 @@ impl From<web::Json<StatusCount>> for StatusCount {
     }
 }
 
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PoolThreads {
+    pub name: String,
+    pub source_name: String,
+    pub count: usize,
+    pub runnable: usize,
+    pub waitting: usize,
+    pub time_waitting: usize,
+    pub block: usize,
+}
+
+impl From<web::Json<PoolThreads>> for PoolThreads {
+    fn from(thread_count: web::Json<PoolThreads>) -> Self {
+        PoolThreads {
+            name: thread_count.name.clone(),
+            source_name: thread_count.source_name.clone(),
+            count: thread_count.count,
+            runnable: thread_count.runnable,
+            waitting: thread_count.waitting,
+            time_waitting: thread_count.time_waitting,
+            block: thread_count.block
+        }
+    }
+}
+
 #[derive(Deserialize, Debug, Clone)]
 pub struct StatusQuery {
     pub files: Vec<String>,
