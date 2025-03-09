@@ -485,6 +485,7 @@ impl From<web::Json<StatusQuery>> for StatusQuery {
 #[derive(Deserialize, Debug, Clone)]
 pub struct ThreadsQuery {
     pub file_id: String,
+    pub status: Option<ThreadStatus>,
     pub thread_ids: Option<Vec<String>>
 }
 
@@ -492,6 +493,7 @@ impl From<web::Json<ThreadsQuery>> for ThreadsQuery {
     fn from(count_query: web::Json<ThreadsQuery>) -> Self {
         ThreadsQuery {
             file_id: count_query.file_id.clone(),
+            status: count_query.status.clone(),
             thread_ids: count_query.thread_ids.clone(),
         }
     }
@@ -518,6 +520,14 @@ impl From<web::Json<ThreadDetail>> for ThreadDetail {
             stack_dep: detail.stack_dep,
         }
     }
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct ThreadContent {
+    pub id: String,
+    pub name: String,
+    pub status: ThreadStatus,
+    pub content: Vec<String>
 }
 
 impl ThreadDetail {

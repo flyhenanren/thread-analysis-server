@@ -1,14 +1,15 @@
 use std::collections::HashMap;
+use rayon::vec;
 use sqlx::SqlitePool;
 
 use crate::{
-    db_access::db_thread, error::AnalysisError,  models::thread::{PoolThreads, StatusCount, StatusQuery, ThreadDetail, ThreadsQuery}
+    db_access::{db_file, db_thread}, error::AnalysisError, file, models::thread::{PoolThreads, StatusCount, StatusQuery, ThreadContent, ThreadDetail, ThreadStatus, ThreadsQuery}
 };
 
 
 /// 获取线程详情
 pub async fn get_thread_detail(pool: &SqlitePool, threads_query: &ThreadsQuery) -> Result<Vec<ThreadDetail>, AnalysisError> {
-    match db_thread::list_threads(pool, &threads_query.file_id, &threads_query.thread_ids).await{
+    match db_thread::list_threads(pool, &threads_query.file_id, &threads_query.status, &threads_query.thread_ids).await{
         Ok(thread_info) => {
             return Ok(thread_info.iter().map(|thread| ThreadDetail::new(thread)).collect());
         },
@@ -65,7 +66,7 @@ pub async fn count_status_by_file(
     pool: &SqlitePool,
     file_id: &str,
 ) -> Result<Vec<PoolThreads>, AnalysisError> {
-    match db_thread::list_threads(pool, file_id, &None).await{
+    match db_thread::list_threads(pool, file_id, &None, &None).await{
         Ok(threads_info) => {
             let mut pool_map: HashMap<String, PoolThreads> = HashMap::new();
             for thread in &threads_info{
@@ -157,5 +158,30 @@ pub async fn count_status_by_thread(
             return Ok(counts.into_values().collect());
         },
         Err(err) => Err(AnalysisError::DBError(format!("对象转换错误:{}", err))),
+    }
+}
+
+
+// 读取线程详情内容
+pub async fn get_thread_content(pool: &SqlitePool, thread_id: &str) -> Result<ThreadContent, AnalysisError> {
+    match db_file::get_file_by_thread(pool, &thread_id).await{
+        Ok(file_info) => {
+            let content = if file_info.end_line - file_info.start_line > 2  {
+                file::index::read_lines_from_file(&file_info.file_path, (file_info.start_line  + 2) as usize, file_info.end_line as usize)?
+            }else{
+                vec![]
+            };
+            Ok(
+                ThreadContent{
+                    id: file_info.id,
+                    name: file_info.thread_name,
+                    status: ThreadStatus::try_from(file_info.thread_status).unwrap(),
+                    content: if content.len() > 2 { content } else { vec![] },
+                }
+            )
+        },
+        Err(err) =>{
+            Err(AnalysisError::DBError(format!("没有获取到数据:{}", err)))
+        } ,
     }
 }

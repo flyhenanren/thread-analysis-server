@@ -2,6 +2,8 @@ use sqlx::{SqlitePool, Transaction};
 
 use crate::{error::DBError, SourceFileInfo};
 
+use super::db::DBThread;
+
 
 pub async fn batch_add(pool: &SqlitePool, file_infos: Vec<SourceFileInfo>) -> Result<(), DBError> {
     let transaction: Transaction<'_, sqlx::Sqlite> = pool.begin().await?;
@@ -33,4 +35,15 @@ pub async fn delete_all(pool: &SqlitePool) -> Result<bool, DBError> {
         .execute(pool)
         .await?;
     Ok(result.rows_affected() > 0)
+}
+
+pub async fn get_file_by_thread(pool: &SqlitePool, id: &str) -> Result<DBThread, DBError> {
+    let file_info = sqlx::query_as::<_, DBThread>(r#"SELECT T.ID, F.FILE_PATH, T.THREAD_NAME, T.THREAD_STATUS, T.START_LINE, T.END_LINE FROM FILE_INFO F 
+                                LEFT JOIN THREAD_INFO T 
+                                ON F.ID = T.FILE_ID 
+                                WHERE T.ID = ?"#)
+    .bind(id)
+    .fetch_one(pool)
+    .await?;
+Ok(file_info)
 }

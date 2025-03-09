@@ -52,3 +52,15 @@ pub async fn count_thread_status(app_state: web::Data<AppState>,
             Err(err) => Err(AnalysisError::DBError(format!("对象转换错误:{}", err))),
         }
 }
+
+pub async fn get_thread_content(app_state: web::Data<AppState>,
+    thread_id: web::Path<String>,) -> Result<HttpResponse, AnalysisError> {
+        match thread_dump::get_thread_content(&app_state.pool, &thread_id).await {
+            Ok(status_counts) => Ok(HttpResponse::Ok().json(ApiResponse::success(Some(status_counts)))),
+            Err(err) => {
+                    Ok(HttpResponse::Ok().json(ApiResponse::error(201, format!("执行失败:{}", err).as_str())))
+            }
+                
+        }
+}
+

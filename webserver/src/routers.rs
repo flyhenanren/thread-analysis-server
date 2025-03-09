@@ -27,6 +27,7 @@ pub fn file_routes(cfg: &mut web::ServiceConfig) {
     .service(
         web::scope("/thread")
             .route("/query", web::post().to(query_threads))
+            .route("/content/{thread_id}", web::get().to(get_thread_content))
             
     )
     ;

@@ -1,7 +1,7 @@
 use chrono::Utc;
 use sqlx::{SqlitePool, Transaction};
 
-use crate::{error::DBError, models::thread::StatusQuery, StatusInfo, ThreadInfo};
+use crate::{error::DBError, models::thread::{StatusQuery, ThreadStatus}, StatusInfo, ThreadInfo};
 
 pub async fn batch_add(
     pool: &SqlitePool,
@@ -58,7 +58,7 @@ pub async fn list_by_work_space(
     Ok(work_space)
 }
 
-pub async fn get(pool: &SqlitePool, id: i32) -> Result<ThreadInfo, DBError> {
+pub async fn get(pool: &SqlitePool, id: &str) -> Result<ThreadInfo, DBError> {
     let work_sapce = sqlx::query_as::<_, ThreadInfo>("SELECT * FROM THREAD_INFO WHERE ID = ?")
         .bind(id)
         .fetch_one(pool)
@@ -99,28 +99,34 @@ pub async fn count_threads_status(
 pub async fn list_threads(
     pool: &SqlitePool,
     file_id: &str,
+    status: &Option<ThreadStatus>,
     thread_ids: &Option<Vec<String>>,
 ) -> Result<Vec<ThreadInfo>, DBError> {
-    let mut sql = r#"select * from THREAD_INFO where file_id = ?"#.to_string();
+    let mut sql = "SELECT * FROM THREAD_INFO WHERE file_id = ?".to_string();
+
+    if let Some(ids) = thread_ids.as_ref().filter(|ids| !ids.is_empty()) {
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+        sql.push_str(&format!(" AND ID IN ({})", placeholders));
+    }
+
+    if status.is_some() {
+        sql.push_str(" AND THREAD_STATUS = ?");
+    }
+
+    let mut query_builder = sqlx::query_as::<_, ThreadInfo>(&sql).bind(file_id);
+
     if let Some(ids) = thread_ids {
-        let placeholder = ids
-            .iter()
-            .map(|_| "?".to_string())
-            .collect::<Vec<String>>()
-            .join(", ");
-        sql.push_str(&format!(" and ID in ({})", placeholder));
-        let mut query_builder = sqlx::query_as::<_, ThreadInfo>(&sql).bind(file_id);
         for id in ids {
             query_builder = query_builder.bind(id);
         }
-        let result = query_builder.fetch_all(pool).await?;
-        Ok(result)
-    } else {
-        let result = sqlx::query_as::<_, ThreadInfo>(&sql)
-            .bind(file_id)
-            .fetch_all(pool)
-            .await?;
-        Ok(result)
     }
+
+    if let Some(status) = status {
+        query_builder = query_builder.bind(i8::from(status.clone())); // 使用 From 转换
+    }
+    let result = query_builder.fetch_all(pool).await?;
+    Ok(result)
 }
+
+
 

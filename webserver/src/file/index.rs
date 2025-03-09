@@ -68,3 +68,23 @@ fn write(lines: &Vec<String>, path: &str, file_name: &str) -> std::io::Result<()
     }
     Ok(())
 }
+
+
+pub fn read_lines_from_file(file_path: &str, start_line: usize, end_line: usize) -> io::Result<Vec<String>> {
+    let file = File::open(file_path)?;
+    let reader = io::BufReader::new(file);
+
+    let lines: Vec<String> = reader
+        .lines()
+        .enumerate()
+        .filter_map(|(i, line)| {
+            if i + 1 >= start_line && i + 1 <= end_line {
+                line.ok()
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Ok(lines)
+}

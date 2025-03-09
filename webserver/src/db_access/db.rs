@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 use sqlx::{FromRow, Pool, Sqlite, SqlitePool};
 
-use crate::{common::utils, models::{cpu::Cpu, file_info::FileInfo, memory::MemoryValue, thread::Thread}};
+use crate::{common::utils, models::{cpu::Cpu, file_info::FileInfo, memory::MemoryValue, thread::{Thread, ThreadStatus}}};
 
 pub async fn establish_connection() -> Pool<Sqlite> {
     let database_url = env::var("DATABASE_URL").expect("无法获取数据库链接");
@@ -94,6 +94,23 @@ pub struct ThreadStack {
     pub method_lin: Option<u32>,
     pub stack_status: String,
 }
+
+#[derive(Deserialize, Debug, Clone, FromRow)]
+pub struct DBThread {
+    #[sqlx(rename = "ID")]
+    pub id: String,
+    #[sqlx(rename = "FILE_PATH")]
+    pub file_path: String,
+    #[sqlx(rename = "THREAD_NAME")]
+    pub thread_name: String,
+    #[sqlx(rename = "THREAD_STATUS")]
+    pub thread_status: i8,
+    #[sqlx(rename = "START_LINE")]
+    pub start_line: i64,
+    #[sqlx(rename = "END_LINE")]
+    pub end_line: i64
+}
+
 
 #[derive(Serialize, Debug, Clone, FromRow)]
 pub struct CpuInfo {
