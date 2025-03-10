@@ -176,7 +176,7 @@ pub async fn get_thread_content(pool: &SqlitePool, thread_id: &str) -> Result<Th
                     id: file_info.id,
                     name: file_info.thread_name,
                     status: ThreadStatus::try_from(file_info.thread_status).unwrap(),
-                    content: if content.len() > 2 { content } else { vec![] },
+                    content,
                 }
             )
         },
