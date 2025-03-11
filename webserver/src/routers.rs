@@ -1,4 +1,4 @@
-use crate::{db_access::db_stack::*, handlers::{file::*, general::*, thread::*}};
+use crate::{db_access::db_stack::*, handlers::{async_task::{query_task_process}, file::*, general::*, thread::*}};
 use actix_web::web;
 
 
@@ -7,15 +7,14 @@ pub fn general_routers(cfg: &mut web::ServiceConfig) {
 }
 
 pub fn file_routes(cfg: &mut web::ServiceConfig) {
-    cfg.service(
+    cfg
+    .service(web::scope("/task")
+                        .route("/query_process/{task_id}", web::get().to(query_task_process)))
+    .service(
         web::scope("/file")
             .route("/open", web::post().to(load_file_handler))
             .route("/list", web::get().to(list_work_space))
             .route("/clean", web::get().to(clean_open_file))
-            // .route("/{teacher_id}", web::get().to(get_course_for_teacher))
-            // .route("/{teacher_id}/{course_id}", web::get().to(get_course_detail))
-            // .route("/{teacher_id}/{course_id}", web::delete().to(delete_course))
-            // .route("/{teacher_id}/{course_id}", web::put().to(update_coruse_detail)),
     )
     .service(
         web::scope("/dump")

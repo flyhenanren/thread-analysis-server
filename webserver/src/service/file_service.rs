@@ -1,28 +1,21 @@
 use std::{collections::HashMap, path::Path};
 
-use chrono::Utc;
 use itertools::Itertools;
-use log::{debug, info};
 use rayon::prelude::*;
 use sqlx::{SqlitePool};
 
 use crate::{
-    common::file_utils::{self},
-    db_access::{db_cpu, db_file, db_memeory, db_stack, db_thread, db_worksapce},
-    error::AnalysisError,
-    file::{self, parse::{CpuParser, MemoryParser, ParseFile, ThreadParser}},
-    models::{file_info::FileInfo, thread::{StackDumpInfo, ThreadStatus}},
-    CpuInfo, FileWorkSpace, MemoryInfo, ModelTransfer, SourceFileInfo, ThreadInfo, ThreadStack,
+    common::file_utils::{self}, db_access::{db_cpu, db_file, db_memeory, db_stack, db_thread, db_worksapce}, error::AnalysisError, file::{self, parse::{CpuParser, MemoryParser, ParseFile, ThreadParser}}, models::{file_info::FileInfo, thread::{StackDumpInfo, ThreadStatus}}, task::async_task::ExecuteContext, CpuInfo, FileWorkSpace, MemoryInfo, ModelTransfer, SourceFileInfo, ThreadInfo, ThreadStack
 };
 
 /// 分析文件夹或者文件中的线程信息,并生成到数据库中
-pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError> {
-    let start = Utc::now().timestamp_millis();
+pub async fn analysis(pool: &SqlitePool, path: &str, context: &ExecuteContext) -> Result<String, AnalysisError> {
     let file_type: u8 =
         file_utils::get_file_type(path).map_err(|e| AnalysisError::ParseError(e.to_string()))?;
     let source_path = Path::new(path);
     // 读取或生成文件索引
     let work_space;
+    context.update_progress(1.0, Some("读取文件".to_string())).await;
     let files: Vec<FileInfo> = match file_type {
         1 => {
             work_space = FileWorkSpace::new(&path);
@@ -33,31 +26,18 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
         _ => {
             work_space = FileWorkSpace::new(path);
             db_worksapce::add(pool, &work_space).await?;
+            context.update_progress(2.0, Some("解压".to_string())).await;
             file_utils::unzip_and_extract_file(source_path, &work_space.id)
                 .unwrap_or_else(|e| panic!("读取文件时发生错误：{}", e))
         }
     };
-    let finish_unzip = Utc::now().timestamp_millis();
-    debug!("finish_unzip:{}", finish_unzip - start);
-
+    context.update_progress(10.0, Some("解析CPU文件".to_string())).await;
     let cpu_info = CpuParser::parse(path, &files)?;
-    let finish_parse_cpu = Utc::now().timestamp_millis();
-    debug!("finish_parse_cpu:{}", finish_parse_cpu - finish_unzip);
-
+    context.update_progress(15.0, Some("解析线程文件".to_string())).await;
     let threads_map = ThreadParser::parse(path, &files)?;
-    let finish_parse_thread = Utc::now().timestamp_millis();
-    debug!(
-        "finish_parse_thread:{}",
-        finish_parse_thread - finish_parse_cpu
-    );
-
+    context.update_progress(25.0, Some("解析内存文件".to_string())).await;
     let memory_info = MemoryParser::parse(path, &files)?;
-    let finish_parse_memory = Utc::now().timestamp_millis();
-    debug!(
-        "finish_parse_memory:{}",
-        finish_parse_memory - finish_parse_thread
-    );
-
+    context.update_progress(30.0, Some("写入文件信息".to_string())).await;
     db_file::batch_add(
         pool,
         files
@@ -66,9 +46,7 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
             .collect(),
     )
     .await?;
-    let finish_db_file = Utc::now().timestamp_millis();
-    debug!("finish_db_file:{}", finish_db_file - finish_parse_memory);
-
+    context.update_progress(35.0, Some("写入CPU信息".to_string())).await;
     db_cpu::batch_add(
         pool,
         cpu_info
@@ -78,9 +56,7 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
         path,
     )
     .await?;
-    let finish_db_cpu = Utc::now().timestamp_millis();
-    debug!("finish_db_cpu:{}", finish_db_cpu - finish_db_file);
-
+    context.update_progress(40.0, Some("解析线程信息".to_string())).await;
     let work_space_id = &work_space.id;
     let threads_count = threads_map
         .into_par_iter()
@@ -94,13 +70,7 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
             })
         })
         .collect::<Vec<(ThreadInfo, Vec<ThreadStack>)>>();
-
-    let finish_count_thread = Utc::now().timestamp_millis();
-    debug!(
-        "finish_count_thread:{}",
-        finish_count_thread - finish_db_cpu
-    );
-
+    
     // 分离 ThreadInfo 和 ThreadStack 的集合
     let mut stack_info = Vec::new();
     let mut threads_info = Vec::new();
@@ -108,18 +78,11 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
         stack_info.extend(stack); // 将所有的 stack 扩展到 stack_info 中
         threads_info.push(thread_info);
     }
-
+    context.update_progress(50.0, Some("写入线程信息".to_string())).await;
     db_thread::batch_add(pool, threads_info, &work_space.id).await?;
-    let finish_db_thread = Utc::now().timestamp_millis();
-    debug!(
-        "finish_db_thread:{}",
-        finish_db_thread - finish_count_thread
-    );
-
+    context.update_progress(65.0, Some("写入堆栈信息".to_string())).await;
     db_stack::batch_add(pool, &stack_info).await?;
-    let finish_db_stack = Utc::now().timestamp_millis();
-    debug!("finish_db_stack:{}", finish_db_stack - finish_db_thread);
-
+    context.update_progress(95.0, Some("写入内存信息".to_string())).await;
     db_memeory::batch_add(
         pool,
         &memory_info
@@ -128,9 +91,8 @@ pub async fn analysis(pool: &SqlitePool, path: &str) -> Result<(), AnalysisError
             .collect(),
     )
     .await?;
-    let finish_db_memory = Utc::now().timestamp_millis();
-    debug!("finish_db_memory:{}", finish_db_memory - finish_db_stack);
-    Ok(())
+    context.update_progress(100.0, Some("解析完成".to_string())).await;
+    Ok(work_space.id)
 }
 
 /// 获取所有线程文件信息
@@ -195,7 +157,7 @@ mod tests {
     use actix_web::dev::Path;
 
     use super::analysis;
-    use crate::{common, db_access::db};
+    use crate::{common, db_access::db, task::async_task::ExecuteContext};
     use dotenv::dotenv;
 
     #[test]
@@ -209,7 +171,7 @@ mod tests {
         dotenv().ok();
         let path = Path::new("D:\\dump\\20240726XNJK[非涉密].zip");
         let pool: sqlx::Pool<sqlx::Sqlite> = db::establish_connection().await;
-        analysis(&pool, path.as_str());
+        analysis(&pool, path.as_str(), &ExecuteContext{ pool: todo!(), channel: todo!(), param: todo!() });
     }
 
     #[actix_rt::test]
@@ -217,13 +179,13 @@ mod tests {
         let path = Path::new("D:\\dump\\20240726");
         dotenv().ok();
         let pool: sqlx::Pool<sqlx::Sqlite> = db::establish_connection().await;
-        analysis(&pool, path.as_str());
+        analysis(&pool, path.as_str(),&ExecuteContext{ pool: todo!(), channel: todo!(), param: todo!() });
     }
     #[actix_rt::test]
     async fn test_walk_dir() {
         let path = Path::new("D:\\dump\\20240809_1");
         dotenv().ok();
         let pool: sqlx::Pool<sqlx::Sqlite> = db::establish_connection().await;
-        analysis(&pool, path.as_str());
+        analysis(&pool, path.as_str(),&ExecuteContext{ pool: todo!(), channel: todo!(), param: todo!() });
     }
 }

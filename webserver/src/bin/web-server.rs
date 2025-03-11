@@ -1,6 +1,7 @@
 use actix_web::{web, App, HttpServer};
 use db_access::db::*;
 use fern::Dispatch;
+use task::async_task::TaskExecutor;
 use std::io;
 use dotenv::dotenv;
 use log::info;
@@ -26,6 +27,9 @@ mod service;
 #[path = "../db_access/mod.rs"]
 mod db_access;
 
+#[path = "../task//mod.rs"]
+mod task;
+
 use routers::*;
 use state::AppState;
 
@@ -37,10 +41,11 @@ async fn main() -> io::Result<()> {
     // let _url = env::var("DATABASE_URL").expect("找不到环境变量中的信息");
     let pool: sqlx::Pool<sqlx::Sqlite> = establish_connection().await;
     // 引入数据库
-
+    let executor: TaskExecutor = TaskExecutor::new();
     // 初始化共享数据
     let shared_data = web::Data::new(AppState {
-        pool
+        pool,
+        executor
     });
 
     let app = move || {

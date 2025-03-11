@@ -1,5 +1,5 @@
 use actix_web::{web, HttpResponse};
-use crate::{error::AnalysisError, models::resp::ApiResponse, service::file_service, state::AppState};
+use crate::{common::utils, error::AnalysisError, models::resp::ApiResponse, service::file_service, state::AppState, task::{async_task::TaskExecutor, file_analysis_task::ParseFile}};
 
 pub async fn load_file_handler(
     app_state: web::Data<AppState>,
@@ -10,8 +10,9 @@ pub async fn load_file_handler(
             match exist {
                 true => Ok(HttpResponse::Ok().json(ApiResponse::ok())),
                 false => {
-                    let _ = file_service::analysis(&app_state.pool, &path).await?;
-                    Ok(HttpResponse::Ok().json(ApiResponse::ok()))
+                    let task_id = utils::rand_id();
+                    app_state.executor.submit_task(&task_id, ParseFile, Some(app_state.pool.clone()), Some(path.to_string())).await;
+                    Ok(HttpResponse::Ok().json(ApiResponse::success(Some(task_id.to_string()))))
                 }
             }
         },
