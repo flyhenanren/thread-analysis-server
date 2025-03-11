@@ -30,11 +30,11 @@ pub async fn list(pool: &SqlitePool, work_space: &str) -> Result<Vec<SourceFileI
     Ok(work_space)
 }
 
-pub async fn delete_all(pool: &SqlitePool) -> Result<bool, DBError> {
-    let result = sqlx::query("DELETE * FROM FILE_INFO")
+pub async fn delete_all(pool: &SqlitePool) -> Result<(), DBError> {
+    sqlx::query("DELETE FROM FILE_INFO")
         .execute(pool)
         .await?;
-    Ok(result.rows_affected() > 0)
+    Ok(())
 }
 
 pub async fn get_file_by_thread(pool: &SqlitePool, id: &str) -> Result<DBThread, DBError> {

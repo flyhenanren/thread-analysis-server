@@ -121,9 +121,9 @@ pub async fn get(pool: &SqlitePool, id: i32) -> Result<ThreadStack, DBError> {
     Ok(work_sapce)
 }
 
-pub async fn delete_all(pool: &SqlitePool) -> Result<bool, DBError> {
-    let result = sqlx::query("DELETE * FROM THREAD_STACK")
+pub async fn delete_all(pool: &SqlitePool) -> Result<(), DBError> {
+    sqlx::query("DELETE FROM THREAD_STACK")
         .execute(pool)
         .await?;
-    Ok(result.rows_affected() > 0)
+    Ok(())
 }

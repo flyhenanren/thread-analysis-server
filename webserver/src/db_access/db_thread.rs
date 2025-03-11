@@ -74,11 +74,11 @@ pub async fn delete(pool: &SqlitePool, id: i32) -> Result<bool, DBError> {
     Ok(result.rows_affected() > 0)
 }
 
-pub async fn delete_all(pool: &SqlitePool) -> Result<bool, DBError> {
-    let result = sqlx::query("DELETE * FROM THREAD_INFO")
+pub async fn delete_all(pool: &SqlitePool) -> Result<(), DBError> {
+    sqlx::query("DELETE FROM THREAD_INFO")
         .execute(pool)
         .await?;
-    Ok(result.rows_affected() > 0)
+    Ok(())
 }
 
 pub async fn count_threads_status(

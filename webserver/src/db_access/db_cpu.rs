@@ -36,9 +36,9 @@ pub async fn list(pool: &SqlitePool, work_space: &str) -> Result<Vec<CpuInfo>, D
 }
 
 
-pub async fn delete_all(pool: &SqlitePool) -> Result<bool, DBError> {
-    let result = sqlx::query("DELETE * FROM CPU_INFO")
+pub async fn delete_all(pool: &SqlitePool) -> Result<(), DBError> {
+    sqlx::query("DELETE FROM CPU_INFO")
         .execute(pool)
         .await?;
-    Ok(result.rows_affected() > 0)
+    Ok(())
 }

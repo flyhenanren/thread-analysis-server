@@ -46,9 +46,9 @@ pub async fn list(pool: &SqlitePool, work_space: &str) -> Result<Vec<MemoryInfo>
     Ok(work_space)
 }
 
-pub async fn delete_all(pool: &SqlitePool) -> Result<bool, DBError> {
-    let result = sqlx::query("DELETE FROM MEMORY_INFO")
+pub async fn delete_all(pool: &SqlitePool) -> Result<(), DBError> {
+    sqlx::query("DELETE FROM MEMORY_INFO")
         .execute(pool)
         .await?;
-    Ok(result.rows_affected() > 0)
+    Ok(())
 }

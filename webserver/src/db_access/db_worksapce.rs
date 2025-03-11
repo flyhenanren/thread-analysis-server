@@ -47,7 +47,7 @@ pub async fn delete(pool: &SqlitePool, id: i32) -> Result<(), DBError> {
 }
 
 pub async fn delete_all(pool: &SqlitePool) -> Result<(), DBError> {
-    sqlx::query("DELETE * FROM FILE_WORKSPACE")
+    sqlx::query("DELETE FROM FILE_WORKSPACE")
         .execute(pool)
         .await?;
     Ok(())

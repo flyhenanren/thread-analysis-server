@@ -138,16 +138,18 @@ pub async fn exist_work_space(pool: &SqlitePool, path: &str) -> Result<bool, Ana
 }
 
 pub async fn list_work_space(pool: &SqlitePool) -> Result<Vec<FileWorkSpace>, AnalysisError> {
-    Ok(db_worksapce::list(pool).await?)
+    let mut work_space = db_worksapce::list(pool).await?;
+    work_space.sort_by(|a, b| b.create_time.cmp(&a.create_time));
+    Ok(work_space)
 }
 
 pub async fn clean_work_space(pool: &SqlitePool) -> Result<bool, AnalysisError>{
-    db_worksapce::delete_all(pool).await?;
-    db_file::delete_all(pool).await?;
-    db_memeory::delete_all(pool).await?;
-    db_cpu::delete_all(pool).await?;
-    db_thread::delete_all(pool).await?;
-    db_stack::delete_all(pool).await?;
+    db_worksapce::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除工作空间出错：{:?}", err));
+    db_file::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除文件信息出错：{:?}", err));
+    db_memeory::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除内存信息出错：{:?}", err));
+    db_cpu::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除CPU信息出错：{:?}", err));
+    db_thread::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除线程信息出错：{:?}", err));
+    db_stack::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除堆栈信息出错：{:?}", err));
     Ok(true)
 }
 
