@@ -128,6 +128,15 @@ pub struct CpuInfo {
     pub mem_used: f64,
 }
 
+
+#[derive(Serialize, Debug, Clone, FromRow)]
+pub struct CpuCountInfo {
+    pub exe_time: NaiveTime,
+    pub us: f64,
+    pub sy: f64,
+    pub ids: f64
+}
+
 #[derive(Serialize, Debug, Clone, FromRow)]
 pub struct MemoryInfo {
     pub id: String,

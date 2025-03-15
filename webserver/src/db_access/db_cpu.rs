@@ -2,6 +2,8 @@ use sqlx::{SqlitePool, Transaction};
 
 use crate::{error::DBError, CpuInfo};
 
+use super::db::CpuCountInfo;
+
 pub async fn batch_add(pool: &SqlitePool, cpu_infos: Vec<CpuInfo>, work_space: &str) -> Result<(), DBError> {
     let transaction: Transaction<'_, sqlx::Sqlite> = pool.begin().await?;
     for info in cpu_infos {
@@ -41,4 +43,12 @@ pub async fn delete_all(pool: &SqlitePool) -> Result<(), DBError> {
         .execute(pool)
         .await?;
     Ok(())
+}
+
+pub async fn count_info(pool: &SqlitePool, work_space: &str) -> Result<Vec<CpuCountInfo>, DBError> {
+    let work_space = sqlx::query_as::<_, CpuCountInfo>("SELECT exe_time, us, sy, ids FROM CPU_INFO WHERE WORKSPACE = ? ")
+        .bind(work_space)
+        .fetch_all(pool)
+        .await?;
+    Ok(work_space)
 }

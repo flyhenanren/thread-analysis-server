@@ -1,4 +1,4 @@
-use crate::{db_access::db_stack::*, handlers::{async_task::{query_task_process}, file::*, general::*, thread::*}};
+use crate::{db_access::db_stack::*, handlers::{async_task::query_task_process, cpu::*, file::*, general::*, thread::*}, service::cpu_service::count_cpu_status};
 use actix_web::web;
 
 
@@ -27,6 +27,10 @@ pub fn file_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/thread")
             .route("/query", web::post().to(query_threads))
             .route("/content/{thread_id}", web::get().to(get_thread_content))
+    )
+    .service(
+        web::scope("/cpu")
+            .route("/count_info/{workspace_id}", web::get().to(cpu_used_count))
             
     )
     ;

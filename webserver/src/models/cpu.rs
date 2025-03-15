@@ -152,6 +152,15 @@ impl FromStr for Process {
     }
 }
 
+
+#[derive(Serialize)]
+pub struct CpuCount {
+    pub exe_time: Vec<NaiveTime>,
+    pub us: Vec<f64>,
+    pub sy: Vec<f64>,
+    pub ids: Vec<f64>,
+}
+
 #[cfg(test)]
 pub mod test {
     use super::Cpu;
