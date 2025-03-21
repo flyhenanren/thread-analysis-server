@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
 use sqlx::SqlitePool;
 
-use crate::{error::DBError, FileWorkSpace};
+use crate::{error::DBError, models::db::workspace::FileWorkSpace};
 
 pub async fn add(pool: &SqlitePool, work_space: &FileWorkSpace) -> Result<(), DBError> {
     sqlx::query(

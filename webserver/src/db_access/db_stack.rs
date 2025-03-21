@@ -5,7 +5,7 @@ use std::sync::Arc;
 use sqlx::{SqlitePool, Transaction};
 use tokio::sync::mpsc::{self, Sender, Receiver};
 
-use crate::{error::DBError, ThreadStack};
+use crate::{error::DBError, models::db::stack::ThreadStack};
 
 pub async fn batch_add(pool: &SqlitePool, threads: &Vec<ThreadStack>) -> Result<(), DBError> {
     let _ = adjust_config(pool).await;

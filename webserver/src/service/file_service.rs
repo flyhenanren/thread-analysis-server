@@ -5,7 +5,7 @@ use rayon::prelude::*;
 use sqlx::{SqlitePool};
 
 use crate::{
-    common::file_utils::{self}, db_access::{db_cpu, db_file, db_memeory, db_stack, db_thread, db_worksapce}, error::AnalysisError, file::{self, parse::{CpuParser, MemoryParser, ParseFile, ThreadParser}}, models::{file_info::FileInfo, thread::{StackDumpInfo, ThreadStatus}}, task::async_task::ExecuteContext, CpuInfo, FileWorkSpace, MemoryInfo, ModelTransfer, SourceFileInfo, ThreadInfo, ThreadStack
+    common::file_utils::{self}, db_access::{db::ModelTransfer, db_cpu, db_file, db_memeory, db_stack, db_thread, db_worksapce}, error::AnalysisError, file::parse::{CpuParser, MemoryParser, ParseFile, ThreadParser}, models::{db::{cpu::CpuInfo, file::SourceFileInfo, memory::MemoryInfo, stack::ThreadStack, thread::ThreadInfo, workspace::FileWorkSpace}, file_info::FileInfo, thread::{StackDumpInfo, ThreadStatus}}, task::async_task::ExecuteContext, 
 };
 
 /// 分析文件夹或者文件中的线程信息,并生成到数据库中

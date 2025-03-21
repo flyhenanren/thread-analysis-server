@@ -5,3 +5,5 @@ pub mod memory;
 pub mod thread;
 pub mod stack;
 pub mod resp;
+
+pub mod db;

@@ -1,8 +1,7 @@
 use sqlx::{SqlitePool, Transaction};
 
-use crate::{error::DBError, SourceFileInfo};
+use crate::{error::DBError, models::db::{file::SourceFileInfo, thread::DBThread}};
 
-use super::db::DBThread;
 
 
 pub async fn batch_add(pool: &SqlitePool, file_infos: Vec<SourceFileInfo>) -> Result<(), DBError> {

@@ -1,7 +1,7 @@
 use chrono::Utc;
-use sqlx::{SqlitePool, Transaction};
+use sqlx::{SqlitePool};
 
-use crate::{error::DBError, models::thread::{StatusQuery, ThreadStatus}, StatusInfo, ThreadInfo};
+use crate::{error::DBError, models::{db::thread::ThreadInfo, thread::{StatusQuery, ThreadStatus}}, StatusInfo};
 
 pub async fn batch_add(
     pool: &SqlitePool,

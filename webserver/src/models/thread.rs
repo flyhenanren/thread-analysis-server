@@ -5,7 +5,9 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-use crate::{db_access::db::ThreadInfo, error::{FrameError, ThreadError}};
+use crate::{error::{FrameError, ThreadError}};
+
+use super::db::thread::ThreadInfo;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Thread {

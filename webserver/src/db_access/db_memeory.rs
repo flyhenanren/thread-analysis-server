@@ -1,6 +1,6 @@
 use sqlx::{SqlitePool, Transaction};
 
-use crate::{error::DBError, MemoryInfo};
+use crate::{error::DBError, models::db::memory::MemoryInfo};
 
 pub async fn batch_add(pool: &SqlitePool, mem_infos: &Vec<MemoryInfo>) -> Result<(), DBError> {
     let transaction: Transaction<'_, sqlx::Sqlite> = pool.begin().await?;
