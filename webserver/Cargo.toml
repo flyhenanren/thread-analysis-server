@@ -6,46 +6,45 @@ edition = "2021"
 default-run="web-server" 
 
 [dependencies]
-actix-rt="2.6.0"
-actix-web="4.0.0-rc.2"
-chrono={version="0.4.19", features=["serde"]}
-dotenv="0.15.0" #向env中设置环境变量
-#openssl={version="0.10.38", features=["vendored"]}
-serde={version="1.0.134",features=["derive"]}
-serde_derive = "1.0"
-serde_json = "1.0"
+actix-rt.workspace = true
+actix-web.workspace = true
+chrono.workspace = true
+dotenv.workspace = true
+serde.workspace = true
+serde_derive.workspace = true
+serde_json.workspace = true
 
-zip = "2.1.6"
+zip.workspace = true
 #压缩目录使用
-walkdir = "2.5.0"
+walkdir.workspace = true
 
-regex = "1"
+regex.workspace = true
 
-lazy_static = "1.4"
+lazy_static.workspace = true
 #UUID
-uuid = {version = "1.0", features = ["v4"]}
+uuid.workspace = true
 
 # 数据库配置
-sqlx = {version= "0.8.2", features=["runtime-tokio-rustls","tls-rustls","sqlite","time","chrono"]}
+sqlx.workspace = true
 
 # 生成随机数
-rand = "0.8"
+rand.workspace = true
 # 并行处理集合
-rayon = "1.10.0" 
+rayon.workspace = true
 
-itertools="0.14.0"
+itertools.workspace = true
 
 # 日志
-fern="0.7.1"
-log="0.4"
+fern.workspace = true
+log.workspace = true
 
 # CPU核心数
-num_cpus = "1.16"
+num_cpus.workspace = true
 
 
 # 异步任务框架
-tokio = { version = "1", features = ["full"] }
-futures = "0.3"  # 添加这一行
-async-trait = "0.1"
+tokio.workspace = true
+futures.workspace = true
+async-trait.workspace = true
 [[bin]]
 name="web-server"
