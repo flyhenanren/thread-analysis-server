@@ -1,0 +1,17 @@
+[package]
+name = "common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono.workspace=true
+actix-web.workspace = true
+serde.workspace=true
+sqlx.workspace = true
+regex.workspace = true
+uuid.workspace = true
+zip.workspace = true
+#压缩目录使用
+walkdir.workspace = true
+lazy_static.workspace = true
+dotenv.workspace = true

@@ -1,0 +1,18 @@
+[package]
+name = "task"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde.workspace = true
+
+# 异步任务框架
+tokio.workspace = true
+futures.workspace = true
+async-trait.workspace = true
+
+
+# 数据库配置
+sqlx.workspace = true
+
+log.workspace = true

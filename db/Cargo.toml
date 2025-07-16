@@ -4,4 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+common = {path = "../common"}
+domain = {path = "../domain"}
 
+chrono.workspace = true
+serde.workspace = true
+# 数据库配置
+sqlx.workspace = true
+dotenv.workspace = true
+
+serde_json.workspace = true
+
+futures.workspace = true
+tokio.workspace = true
+
+num_cpus.workspace = true

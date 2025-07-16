@@ -460,6 +460,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "chrono",
+ "dotenv",
+ "lazy_static",
+ "regex",
+ "serde",
+ "sqlx",
+ "uuid",
+ "walkdir",
+ "zip",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -583,6 +599,18 @@ dependencies = [
 [[package]]
 name = "db"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "common",
+ "domain",
+ "dotenv",
+ "futures",
+ "num_cpus",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+]
 
 [[package]]
 name = "deflate64"
@@ -660,6 +688,17 @@ dependencies = [
 [[package]]
 name = "domain"
 version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "chrono",
+ "common",
+ "lazy_static",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_json",
+ "sqlx",
+]
 
 [[package]]
 name = "dotenv"
@@ -2107,6 +2146,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "task"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "log",
+ "serde",
+ "sqlx",
+ "tokio",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2435,24 +2486,14 @@ checksum = "af190c94f2773fdb3729c55b007a722abb5384da03bc0986df4c289bf5567e96"
 [[package]]
 name = "web_api"
 version = "0.1.0"
-
-[[package]]
-name = "webpki-roots"
-version = "0.26.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "841c67bff177718f1d4dfefde8d8f0e78f9b6589319ba88312f567fc5841a958"
-dependencies = [
- "rustls-pki-types",
-]
-
-[[package]]
-name = "webserver"
-version = "0.1.0"
 dependencies = [
  "actix-rt",
  "actix-web",
  "async-trait",
  "chrono",
+ "common",
+ "db",
+ "domain",
  "dotenv",
  "fern",
  "futures",
@@ -2467,10 +2508,20 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sqlx",
+ "task",
  "tokio",
  "uuid",
  "walkdir",
  "zip",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "0.26.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "841c67bff177718f1d4dfefde8d8f0e78f9b6589319ba88312f567fc5841a958"
+dependencies = [
+ "rustls-pki-types",
 ]
 
 [[package]]

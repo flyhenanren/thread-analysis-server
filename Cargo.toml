@@ -7,7 +7,7 @@ members = [
   "log_service",
   "search",
   "web_api",
-  "webserver"
+  "common"
   ]
 
 [workspace.dependencies]
