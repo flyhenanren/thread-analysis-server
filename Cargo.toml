@@ -4,7 +4,6 @@ members = [
   "db",
   "dsl_engine",
   "indexer",
-  "log_service",
   "search",
   "web_api",
   "common"
@@ -52,6 +51,8 @@ num_cpus = "1.16"
 tokio = { version = "1", features = ["full"] }
 futures = "0.3"  # 添加这一行
 async-trait = "0.1"
+# 配置加载库
+config = "0.13"
 
 # 对于 Windows 系统，设置 `--windows-subsystem=windows` 隐藏控制台窗口
 [profile.release]

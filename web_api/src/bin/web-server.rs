@@ -1,12 +1,10 @@
-use actix_web::{web, App, HttpServer};
+use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use db::connection::establish_connection;
-use fern::Dispatch;
 use task::async_task::TaskExecutor;
-use std::io;
-use dotenv::dotenv;
-use log::info;
+use std::{io, net::ToSocketAddrs};
+use log::*;
 
-use crate::{router::{file_routes, general_routers}, state::AppState};
+use crate::{config::{AppConfig, SharedConfig}, logger::setup_logger, router::{file_routes, general_routers}, state::AppState};
 
 #[path = "../state.rs"]
 mod state;
@@ -23,21 +21,31 @@ mod file;
 #[path = "../task/mod.rs"]
 mod executor;
 
-
+#[path = "../model/mod.rs"]
+mod model;
+#[path = "../config.rs"]
+mod config;
+#[path = "../logger.rs"]
+mod logger;
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
-    setup_logger(true, "webserver.log").unwrap();
-    info!("Application started");
-    dotenv().ok();
-    // let _url = env::var("DATABASE_URL").expect("找不到环境变量中的信息");
-    let pool: sqlx::Pool<sqlx::Sqlite> = establish_connection().await;
+    // 读取配置
+    let default_cfg = AppConfig::from_env();
+    let log_cfg = default_cfg.log.clone();
+    // 读取实时配置
+    let shared_config = SharedConfig::new(default_cfg);
+    setup_logger(log_cfg).unwrap();
+    let cfg = shared_config.get();
     // 引入数据库
+    let pool: sqlx::Pool<sqlx::Sqlite> = establish_connection().await;
+    // 异步任务执行器
     let executor: TaskExecutor = TaskExecutor::new();
     // 初始化共享数据
     let shared_data = web::Data::new(AppState {
         pool,
-        executor
+        executor,
+        shared_config
     });
 
     let app = move || {
@@ -46,31 +54,13 @@ async fn main() -> io::Result<()> {
             .configure(general_routers)
             .configure(file_routes)
     };
-    HttpServer::new(app).bind("127.0.0.1:3000")?.run().await
+    let addr = format!("{}:{}", cfg.server.host, cfg.server.port);
+    let socket_addr = addr
+                                    .to_socket_addrs()?
+                                    .next()
+                                    .expect("Invalid address");
+    info!("Application started");
+    HttpServer::new(app).bind(socket_addr)?.run().await
 }
 
 
-pub fn setup_logger(log_to_console: bool, log_file: &str) -> Result<(), fern::InitError> {
-    let base_config = Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{} {}-{} [{}] {}",
-                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                record.file().unwrap_or("unknown file"),
-                record.line().unwrap_or(0),
-                record.level(),
-                message
-            ))
-        })
-        .level(log::LevelFilter::Info); // 默认日志级别
-
-    let file_config = base_config.chain(fern::log_file(log_file)?); // 输出到文件
-    let logger = if log_to_console {
-        file_config.chain(std::io::stdout()) // 输出到控制台
-    } else {
-        file_config
-    };
-
-    logger.apply()?; // 应用日志配置
-    Ok(())
-}

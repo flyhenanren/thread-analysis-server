@@ -3,6 +3,10 @@ use common::{error::AnalysisError, string_utils::rand_id};
 
 use crate::{ executor::file_analysis_task::ParseFile, resp::ApiResponse, service::file_service, state::AppState};
 
+/**
+ * 加载文件
+ * 加载的文件
+ */
 pub async fn load_file_handler(
     app_state: web::Data<AppState>,
     path: String
