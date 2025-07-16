@@ -4,7 +4,9 @@ use common::error::AnalysisError;
 use crate::{resp::ApiResponse, state::AppState};
 
 
-
+/**
+ * 异步任务执行进度查询
+ */
 pub async fn query_task_process(
   app_state: web::Data<AppState>,
   process_id: web::Path<String>,

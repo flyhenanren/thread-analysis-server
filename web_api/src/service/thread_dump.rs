@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use common::error::AnalysisError;
 use db::db_access::{db_file, db_thread};
 use domain::model::thread::{PoolThreads, StatusCount, StatusQuery, ThreadContent, ThreadDetail, ThreadStatus, ThreadsQuery};
-use rayon::vec;
 use sqlx::SqlitePool;
 
 use crate::file;

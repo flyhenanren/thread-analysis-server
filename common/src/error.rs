@@ -1,6 +1,7 @@
 use actix_web::{error, http::StatusCode, HttpResponse, Result};
 use serde::{Deserialize, Serialize};
 use sqlx::error::Error as SQLxError;
+use tantivy::{directory::error::OpenDirectoryError, TantivyError};
 use std::{fmt, io::Error, num::ParseIntError};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -10,6 +11,7 @@ pub enum AnalysisError {
     NotFound(String),
     IoError(String),
     ParseError(String),
+    RegError(String)
 }
 
 
@@ -62,6 +64,10 @@ impl AnalysisError {
                 println!("Io error:{:?}", msg);
                 msg.into()
             },
+            AnalysisError::RegError(msg) => {
+                println!("Regex error:{:?}", msg);
+                msg.into()
+            }
         }
     }
 }
@@ -164,5 +170,19 @@ impl From<SQLxError> for DBError {
 impl From<Error> for AnalysisError {
     fn from(value: Error) -> Self {
         AnalysisError::ParseError(value.to_string())
+    }
+}
+
+
+impl From<OpenDirectoryError> for AnalysisError {
+    fn from(value: OpenDirectoryError) -> Self {
+        AnalysisError::IoError(value.to_string())
+    }
+}
+
+
+impl From<TantivyError> for AnalysisError {
+    fn from(value: TantivyError) -> Self {
+        AnalysisError::IoError(value.to_string())
     }
 }

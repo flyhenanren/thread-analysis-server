@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse};
 use common::{error::AnalysisError, string_utils::rand_id};
 
-use crate::{ executor::file_analysis_task::ParseFile, resp::ApiResponse, service::file_service, state::AppState};
+use crate::{ executor::file_prase::ParseFile, resp::ApiResponse, service::file_service, state::AppState};
 
 /**
  * 加载文件
@@ -22,25 +22,30 @@ pub async fn load_file_handler(
                 }
             }
         },
-        Err(err) => Err(AnalysisError::ActixError(format!("工作空间查询异常：{}",err))),
+        Err(err) => Ok(HttpResponse::Ok().json(ApiResponse::error(500, &format!("查询工作空间异常：{}", err))))
     }
 }
 
-
+/**
+ * 读取工作空间
+ */
 pub async fn list_work_space(
     app_state: web::Data<AppState>
 ) -> Result<HttpResponse, AnalysisError>  {
     match file_service::list_work_space(&app_state.pool).await {
         Ok(work_space) => Ok(HttpResponse::Ok().json(ApiResponse::success(Some(work_space)))),
-        Err(err) => Err(AnalysisError::ActixError(format!("工作空间查询异常：{}",err))),
+        Err(err) => Ok(HttpResponse::Ok().json(ApiResponse::error(500, &format!("查询工作空间异常：{}", err))))
     }
 }
 
+/**
+ * 清理工作空间
+ */
 pub async fn clean_open_file(
     app_state: web::Data<AppState>
 ) -> Result<HttpResponse, AnalysisError>  {
     match file_service::clean_work_space(&app_state.pool).await {
         Ok(_) => Ok(HttpResponse::Ok().json(ApiResponse::ok())),
-        Err(err) => Err(AnalysisError::ActixError(format!("清理工作空间异常：{}", err))),
+        Err(err) => Ok(HttpResponse::Ok().json(ApiResponse::error(500, &format!("清理工作空间异常：{}", err))))
     }
 }
