@@ -56,7 +56,7 @@ impl ThreadSearchIdx {
             let pattern = safe_regex(query_str)?;
             queries.push((
                 Occur::Should,
-                Box::new(RegexQuery::from_pattern(&pattern, self.method_raw)?) as Box<dyn Query>,
+                Box::new(RegexQuery::from_pattern(&pattern, self.method_token)?) as Box<dyn Query>,
             ));
         } else {
             queries.push((
@@ -73,6 +73,14 @@ impl ThreadSearchIdx {
                 Box::new(FuzzyTermQuery::new(
                     Term::from_field_text(self.method_token, query_str),
                     max_edits,
+                    true,
+                )),
+            ));
+              queries.push((
+                Occur::Should,
+                Box::new(FuzzyTermQuery::new_prefix(
+                    Term::from_field_text(self.method_token, query_str),
+                    1,
                     true,
                 )),
             ));
@@ -109,31 +117,17 @@ impl ThreadSearchIdx {
 
 
 fn safe_regex(input: &str) -> Result<String, AnalysisError> {
-    let mut result = String::from("^");
+    let match_str = "[a-zA-z0-9]*";
+    let mut result = String::from(match_str);
     for c in input.chars() {
         match c {
-            '*' => result.push_str(".*"),
-            '?' => result.push('.'),
-            '.' => result.push_str("\\."),
-            '(' => result.push_str("\\("),
-            ')' => result.push_str("\\)"),
-            '[' => result.push_str("\\["),
-            ']' => result.push_str("\\]"),
-            '{' => result.push_str("\\{"),
-            '}' => result.push_str("\\}"),
-            '\\' => result.push_str("\\\\"),
-            '+' | '^' | '$' | '|' => {
-                result.push('\\');
-                result.push(c);
-            }
+            '*' => result.push_str(match_str),
+            ' ' => result.push_str(match_str),
             other => result.push(other),
         }
     }
-    result.push('$');
-     // 🚨 修复尾部 .* 问题，避免 Leviathan 报错
-    if result.ends_with(".*$") {
-        result = result.trim_end_matches(".*$").to_string();
-        result.push_str(".+$");
+    if !result.ends_with("*") {
+        result.push_str(match_str);    
     }
     println!("生成的正则表达式: {}", result);
     match Regex::new(&result){
@@ -145,7 +139,7 @@ fn safe_regex(input: &str) -> Result<String, AnalysisError> {
 
 
 fn contains_wildcard(query: &str) -> bool {
-    query.contains('*') || query.contains('?')
+    !query.contains(".") && (query.contains('*') || query.contains('?') || query.contains(" "))
 }
 
 #[cfg(test)]
@@ -155,7 +149,7 @@ pub mod tests {
     use super::*;
 
     #[test]
-    pub fn test_search() {
+    pub fn test_search_pre() {
         let search_index = ThreadSearchIdx::create("D:\\dump\\.idx").unwrap();
         search_index.clean().unwrap();
         // 添加测试数据
@@ -170,24 +164,56 @@ pub mod tests {
             search_index.add_doc(method).unwrap();
         }
 
-        // 测试1：短字符串搜索（使用前缀匹配更合理）
+
         let results = search_index.search("co", 1).unwrap();
-        assert!(!results.is_empty(), "短字符串搜索应返回结果");
+        assert!(!results.is_empty(), "无返回");
         println!("'co' 结果: {:?}", results);
-
-        // 测试2：模糊搜索
-        let full_class = "com*nr";
-        let results = search_index.search(full_class, 2).unwrap();
-        assert!(
-            results.iter().any(|r| r.contains(full_class)),
-            "应匹配完整类名"
-        );
-
-        // 测试3：方法名搜索
-        let results = search_index.search("query", 1).unwrap();
-        assert!(!results.is_empty(), "应匹配方法名");
-
-        // 清理测试索引
         
     }
+
+    #[test]
+    pub fn test_search_reg() {
+        let search_index = ThreadSearchIdx::create("D:\\dump\\.idx").unwrap();
+        search_index.clean().unwrap();
+        // 添加测试数据
+        let test_data = vec![
+            "com.jiuqi.nr.entity.search",
+            "com.jiuqi.nr.task.query",
+            "org.slf4j.LoggerFactory.getLogger",
+            "com.jiuqi.np.definition.facade.FieldDefine.create",
+        ];
+
+        for method in &test_data {
+            search_index.add_doc(method).unwrap();
+        }
+
+        let full_class = "Field*";
+        let results = search_index.search(full_class, 2).unwrap();
+        assert!(!results.is_empty(), "无返回");
+        println!("{:?}", results);
+    }
+
+#[test]
+    pub fn test_search_any() {
+        let search_index = ThreadSearchIdx::create("D:\\dump\\.idx").unwrap();
+        search_index.clean().unwrap();
+        // 添加测试数据
+        let test_data = vec![
+            "com.jiuqi.nr.entity.search",
+            "com.jiuqi.nr.task.query",
+            "org.slf4j.LoggerFactory.getLogger",
+            "com.jiuqi.np.definition.facade.FieldDefine.create",
+        ];
+
+        for method in &test_data {
+            search_index.add_doc(method).unwrap();
+        }
+
+        
+        let results = search_index.search("def", 2).unwrap();
+        assert!(!results.is_empty(), "无返回");
+        println!("'def' 结果: {:?}", results);
+        
+    }
+
 }
