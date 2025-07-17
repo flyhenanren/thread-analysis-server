@@ -1,6 +1,6 @@
 use actix_web::web;
 use chrono::{NaiveDateTime};
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -1041,7 +1041,7 @@ pub mod tests {
           "\"GC task thread#0 (ParallelGC)\" os_prio=0 tid=0x0000ffff8c060800 nid=0xec316 runnable ".to_string(),
     ];
         let result = Thread::new(&lines,0,0);
-        let mut frames: Vec<CallFrame> = Vec::new();
+        let frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: None,
             name: "GC task thread#0 (ParallelGC)".to_string(),
@@ -1065,7 +1065,7 @@ pub mod tests {
             "\"VM Thread\" os_prio=0 tid=0x0000ffff8c132000 nid=0xec341 runnable ".to_string(),
         ];
         let result = Thread::new(&lines,0,0);
-        let mut frames: Vec<CallFrame> = Vec::new();
+        let frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: None,
             name: "VM Thread".to_string(),
@@ -1089,7 +1089,7 @@ pub mod tests {
           "\"VM Periodic Task Thread\" os_prio=0 tid=0x0000ffff8c1ab000 nid=0xec358 waiting on condition ".to_string(),
     ];
         let result = Thread::new(&lines,0,0);
-        let mut frames: Vec<CallFrame> = Vec::new();
+        let frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: None,
             name: "VM Periodic Task Thread".to_string(),
@@ -1113,7 +1113,7 @@ pub mod tests {
           "\"消息接收线程\" #206 prio=5 os_prio=0 tid=0x0000fffc052fa000 nid=0xed49b sleeping[0x0000fffea63fe000]".to_string(),
     ];
         let result = Thread::new(&lines,0,0);
-        let mut frames: Vec<CallFrame> = Vec::new();
+        let frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: Some("#206".into()),
             name: "消息接收线程".to_string(),
@@ -1136,7 +1136,7 @@ pub mod tests {
           "\"lettuce-timer-3-1\" #63 daemon prio=5 os_prio=0 tid=0x0000fffd7ac8e000 nid=0xec9e9 sleeping[0x0000ffff075fe000]".to_string(),
     ];
         let result = Thread::new(&lines,0,0);
-        let mut frames: Vec<CallFrame> = Vec::new();
+        let frames: Vec<CallFrame> = Vec::new();
         let thread = Thread {
             id: Some("#63".into()),
             name: "lettuce-timer-3-1".to_string(),

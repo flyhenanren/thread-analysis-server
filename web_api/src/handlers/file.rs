@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse};
 use common::{error::AnalysisError, string_utils::rand_id};
 
-use crate::{ executor::file_prase::ParseFile, resp::ApiResponse, service::file_service, state::AppState};
+use crate::{ executor::file_prase::ParseFileAsyncTask, resp::ApiResponse, service::file_service, state::AppState};
 
 /**
  * 加载文件
@@ -17,7 +17,7 @@ pub async fn load_file_handler(
                 true => Ok(HttpResponse::Ok().json(ApiResponse::ok())),
                 false => {
                     let task_id = rand_id();
-                    app_state.executor.submit_task(&task_id, ParseFile, Some(app_state.pool.clone()), Some(path.to_string())).await;
+                    app_state.executor.submit_task(&task_id, ParseFileAsyncTask, Some(app_state.pool.clone()), Some(path.to_string())).await;
                     Ok(HttpResponse::Ok().json(ApiResponse::success(Some(task_id.to_string()))))
                 }
             }

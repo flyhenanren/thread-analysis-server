@@ -4,6 +4,7 @@ use db::db_access::db_memeory;
 
 use crate::state::AppState;
 
+#[allow(dead_code)]
 pub async fn query_memeory(
     app_state: web::Data<AppState>,
     path: web::Json<String>,

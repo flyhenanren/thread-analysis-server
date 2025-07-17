@@ -1,4 +1,4 @@
-use std::io::{self, BufRead, BufReader, BufWriter, Error, ErrorKind, Read, Write};
+use std::io::{self, BufRead, BufReader, BufWriter, ErrorKind, Write};
 use std::{fs::File, path::Path};
 
 
@@ -8,6 +8,7 @@ pub trait FileIndex<T, U> {
     fn exist_index(path: &str) -> bool;
 }
 
+#[allow(dead_code)]
 fn read(path: &str, file_name: &str) -> std::io::Result<Vec<String>> {
     let target_path = Path::new(path).join(file_name);
     if target_path.exists() {
@@ -23,6 +24,7 @@ fn read(path: &str, file_name: &str) -> std::io::Result<Vec<String>> {
     Err(std::io::Error::new(ErrorKind::NotFound, "不存在索引文件"))
 }
 
+#[allow(dead_code)]
 fn read_by_line(
     path: &str,
     file_name: &str,
@@ -46,11 +48,12 @@ fn read_by_line(
 
     Ok(lines)
 }
+#[allow(dead_code)]
 fn exist(path: &str, name: &str) -> bool {
     let target_dir = Path::new(path).join(name);
     target_dir.exists()
 }
-
+#[allow(dead_code)]
 fn write(lines: &Vec<String>, path: &str, file_name: &str) -> std::io::Result<()> {
     if !exist(path, &file_name) {
         let file = File::create(Path::new(path).join(file_name))?;

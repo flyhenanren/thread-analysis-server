@@ -11,5 +11,6 @@ use crate::config::SharedConfig;
 pub struct AppState {
     pub pool: Pool<sqlx::Sqlite>,
     pub executor: TaskExecutor,
+    #[allow(dead_code)]
     pub shared_config: SharedConfig,
 }

@@ -1,4 +1,4 @@
-use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{web, App, HttpServer};
 use db::connection::establish_connection;
 use task::async_task::TaskExecutor;
 use std::{io, net::ToSocketAddrs};

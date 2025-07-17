@@ -5,6 +5,7 @@ use db::db_access::db_cpu;
 
 use crate::{service::cpu_service, state::AppState};
 
+#[allow(dead_code)]
 pub async fn query_cpu(
     app_state: web::Data<AppState>,
     path: web::Json<String>,
@@ -12,7 +13,7 @@ pub async fn query_cpu(
     let cpu = db_cpu::list(&app_state.pool, &path).await?;
     Ok(HttpResponse::Ok().json(cpu))
 }
-
+#[allow(dead_code)]
 pub async fn cpu_used_count(
     app_state: web::Data<AppState>,
     workspace_id: web::Path<String>

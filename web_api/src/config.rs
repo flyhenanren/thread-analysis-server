@@ -130,12 +130,12 @@ impl SharedConfig {
         let user_cfg = self.user.read().unwrap();
         self.default.merge(&user_cfg)
     }
-
+    #[allow(dead_code)]
     pub fn set_user_config(&self, partial: PartialAppConfig) {
         let mut w = self.user.write().unwrap();
         *w = partial;
     }
-
+    #[allow(dead_code)]
     pub fn reset_user_config(&self) {
         let mut w = self.user.write().unwrap();
         *w = PartialAppConfig::default();

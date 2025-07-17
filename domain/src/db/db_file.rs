@@ -23,7 +23,7 @@ pub struct DBSourceFile {
 
 
 impl ModelTransfer<FileInfo, DBSourceFile> for DBSourceFile{
-  fn new(file: &FileInfo, file_id: &str, work_space: &str) -> Self {
+  fn new(file: &FileInfo, _file_id: &str, work_space: &str) -> Self {
       Self{
           id: file.id.clone(),
           workspace: work_space.into(),

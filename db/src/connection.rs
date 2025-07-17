@@ -1,4 +1,4 @@
-use sqlx::{FromRow, Pool, Sqlite, SqlitePool};
+use sqlx::{Pool, Sqlite, SqlitePool};
 use std::env;
 
 pub async fn establish_connection() -> Pool<Sqlite> {

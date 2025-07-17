@@ -1,4 +1,4 @@
-use actix_web::web::{self, Form};
+use actix_web::web::{self};
 use chrono::NaiveDateTime;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -96,10 +96,10 @@ impl TryFrom<i8> for FileType{
     fn try_from(value: i8) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(FileType::CpuThread),
-            1 => Ok(FileType::CpuTop),
-            1 => Ok(FileType::StackTrace),
-            1 => Ok(FileType::Gc),
-            1 => Ok(FileType::GcUtil),
+            2 => Ok(FileType::CpuTop),
+            3 => Ok(FileType::StackTrace),
+            4 => Ok(FileType::Gc),
+            5 => Ok(FileType::GcUtil),
             _ => Ok(FileType::None)
         }
     }

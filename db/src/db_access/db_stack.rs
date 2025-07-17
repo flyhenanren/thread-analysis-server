@@ -109,7 +109,7 @@ async fn adjust_config(pool: &SqlitePool) -> Result<(), sqlx::Error> {
 
 pub async fn list(pool: &SqlitePool, work_space:&str) -> Result<Vec<DBStack>, DBError> {
     let stack = sqlx::query_as::<_, DBStack>("SELECT * FROM THREAD_STACK WHERE WORKSPACE = ?")
-        .bind(work_space.clone())
+        .bind(work_space)
         .fetch_all(pool)
         .await?;
     Ok(stack)

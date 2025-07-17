@@ -1,4 +1,3 @@
-use chrono::Utc;
 use common::error::DBError;
 use domain::{db::{db::StatusInfo, db_thread::DBThreadInfo}, model::thread::{StatusQuery, ThreadStatus}};
 use sqlx::{SqlitePool};
@@ -10,10 +9,8 @@ pub async fn batch_add(
     thread_infos: Vec<DBThreadInfo>,
     work_space: &str,
 ) -> Result<(), DBError> {
-    let start = Utc::now().timestamp_millis();
     const BATCH_SIZE: usize = 1000; // 每个事务处理的最大记录数
     for chunk in thread_infos.chunks(BATCH_SIZE) {
-        let start_pre = Utc::now().timestamp_millis();
         // 开始一个新的事务
         let mut transaction = pool.begin().await?;
 
@@ -85,7 +82,7 @@ pub async fn delete_all(pool: &SqlitePool) -> Result<(), DBError> {
 
 pub async fn count_threads_status(
     pool: &SqlitePool,
-    status: &StatusQuery,
+    _status: &StatusQuery,
 ) -> Result<Vec<StatusInfo>, DBError> {
     let result = sqlx::query_as::<_, StatusInfo>(
         r#"select f.FILE_PATH, t.* from THREAD_INFO t

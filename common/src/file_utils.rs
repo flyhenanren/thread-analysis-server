@@ -28,7 +28,7 @@ pub fn unzip_and_extract_file(source: &Path, work_space: &str) -> io::Result<Vec
                     }
                 } else {
                     let file_path = target.join(file_name);
-                    let mut exist  = false;
+                    let exist;
                     match if file_path.exists() {
                         exist = true;
                         fs::File::open(&file_path)

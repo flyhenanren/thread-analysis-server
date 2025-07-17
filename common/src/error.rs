@@ -115,7 +115,7 @@ impl fmt::Display for ThreadError {
             ThreadError::ParseIntError(e) => write!(f, "ParseIntError:{}", e),
             ThreadError::MissingField(e) => write!(f, "MissingField:{}", e),
             ThreadError::InvalidStatus => write!(f, "InvalidStatus"),
-            ThreadError::ParseFrame(e) => write!(f, "ParseFrame"),
+            ThreadError::ParseFrame(e) => write!(f, "ParseFrame:{}",e),
         }
     }
 }

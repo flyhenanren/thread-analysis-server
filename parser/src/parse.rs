@@ -1,17 +1,16 @@
-use chrono::{Duration, NaiveDateTime, Utc};
+use chrono::{Duration};
 use common::error::AnalysisError;
 use common::model::file_info::{FileInfo, FileType};
 use domain::model::cpu::Cpu;
 use domain::model::memory::{self, MemoryValue};
 use domain::model::thread::Thread;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use serde::{Deserialize, Serialize};
-use serde_json::{from_str, to_string};
+
 use std::collections::HashMap;
-use std::io::{self, BufRead, BufReader, BufWriter, ErrorKind, Write};
-use std::iter::Map;
-use std::{fs, vec};
-use std::{fs::File, path::Path};
+use std::io::{self, BufRead};
+
+use std::{fs};
+use std::{path::Path};
 
 pub trait ParseFile<T, U> {
     fn parse(path: &str, files: &Vec<U>) -> Result<T, AnalysisError>;
@@ -46,7 +45,7 @@ impl ParseFile<Vec<Cpu>, FileInfo> for CpuParser {
 }
 
 impl ParseFile<Vec<MemoryValue>, FileInfo> for MemoryParser {
-    fn parse(path: &str, files: &Vec<FileInfo>) -> Result<Vec<MemoryValue>, AnalysisError> {
+    fn parse(_path: &str, files: &Vec<FileInfo>) -> Result<Vec<MemoryValue>, AnalysisError> {
         let gc_file: Vec<FileInfo> = files
             .iter()
             .filter(|f| f.file_type == FileType::Gc)
@@ -120,7 +119,7 @@ impl ParseFile<HashMap<String, Vec<Thread>>, FileInfo> for ThreadParser {
                         }
                         if line.contains("nid=") {
                             start = true;
-                            if let Some((last)) = line_tag.last_mut(){
+                            if let Some(last) = line_tag.last_mut(){
                                 last.1 = line_number - 2;
                             }
                             line_tag.push((line_number, line_number));

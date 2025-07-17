@@ -1,7 +1,7 @@
 use chrono::{Duration, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use core::f64;
-use std::io::{BufRead, BufWriter, Error, Read, Write};
+use std::io::{BufRead};
 use std::{fs, io, path::Path};
 
 #[derive(Serialize,Deserialize,Debug, PartialEq)]
@@ -33,7 +33,7 @@ impl MemoryValue {
                 }
                 match l.parse::<f64>() {
                     Ok(value) => value,
-                    Err(e) => 0.0,
+                    Err(_e) => 0.0,
                 }
             })
             .collect()
@@ -56,7 +56,7 @@ impl MemoryPercent {
                 }
                 match l.parse::<f64>() {
                     Ok(value) => value,
-                    Err(e) => 0.00,
+                    Err(_e) => 0.00,
                 }
             })
             .collect()
@@ -69,7 +69,7 @@ pub fn create(path: &str) -> (MemoryValue, MemoryPercent) {
     let fmt = "%Y%m%d_%H%M%S";
     let time = match NaiveDateTime::parse_from_str(path_time.file_name().unwrap().to_str().unwrap(), fmt){
         Ok(time) => Some(time),
-        Err(err) => None,
+        Err(_err) => None,
     };
     let file = fs::File::open(path).unwrap();
     let reader = io::BufReader::new(file);
@@ -183,7 +183,7 @@ pub mod tests {
         let fmt = "%Y%m%d_%H%M%S";
         let time = match NaiveDateTime::parse_from_str(&file_name, fmt){
             Ok(time) => Some(time),
-            Err(err) => None,
+            Err(_err) => None,
         };
         let mut flag = false;
         let mut result: Vec<MemoryValue> = Vec::new();
