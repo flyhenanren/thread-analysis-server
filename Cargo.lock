@@ -1736,6 +1736,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "parser"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "common",
+ "domain",
+ "rayon",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3123,10 +3135,12 @@ dependencies = [
  "dotenv",
  "fern",
  "futures",
+ "indexer",
  "itertools",
  "lazy_static",
  "log",
  "num_cpus",
+ "parser",
  "rand",
  "rayon",
  "regex",

@@ -12,6 +12,8 @@ task = { path = "../task" }
 db = { path = "../db" }
 common = {path = "../common"}
 domain = {path = "../domain"}
+parser = {path = "../parser"}
+indexer = {path = "../indexer"}
 
 actix-rt.workspace = true
 actix-web.workspace = true

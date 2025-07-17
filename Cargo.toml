@@ -6,7 +6,8 @@ members = [
   "indexer",
   "search",
   "web_api",
-  "common"
+  "common",
+  "parser"
   ]
 
 [workspace.dependencies]

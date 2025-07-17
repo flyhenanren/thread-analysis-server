@@ -1,6 +1,6 @@
 use actix_web::web;
 use chrono::{NaiveDateTime};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;

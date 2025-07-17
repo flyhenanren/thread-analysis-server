@@ -105,8 +105,8 @@ impl ParseFile<HashMap<String, Vec<Thread>>, FileInfo> for ThreadParser {
             let file = fs::File::open(path).unwrap();
 
             let reader = io::BufReader::new(file);
-            let mut thread_lines: Vec<Vec<String>> = Vec::new();
-            let mut current_group: Vec<String> = Vec::new();
+            let mut thread_groups: Vec<Vec<String>> = Vec::new();
+            let mut current_thread: Vec<String> = Vec::new();
             let mut start = false;
             let mut line_number:i64 = 0;
             let mut line_tag:Vec<(i64, i64)> = Vec::new();
@@ -124,25 +124,25 @@ impl ParseFile<HashMap<String, Vec<Thread>>, FileInfo> for ThreadParser {
                                 last.1 = line_number - 2;
                             }
                             line_tag.push((line_number, line_number));
-                            if !current_group.is_empty() {
-                                thread_lines.push(current_group);
-                                current_group = Vec::new();
+                            if !current_thread.is_empty() {
+                                thread_groups.push(current_thread);
+                                current_thread = Vec::new();
                             }
                         }
                         if start {
-                            current_group.push(line);
+                            current_thread.push(line);
                         }
                     }
                     Err(_) => {}
                 }
             }
-            if !current_group.is_empty() {
+            if !current_thread.is_empty() {
                 if let Some(last) = line_tag.last_mut() {
                     last.1 = line_number - 2;
                 }
-                thread_lines.push(current_group);
+                thread_groups.push(current_thread);
             }
-            let file_thread_info: Vec<Thread> = thread_lines
+            let file_thread_info: Vec<Thread> = thread_groups
                 .par_iter()
                 .enumerate()
                 .filter_map(|(idx, group)| {

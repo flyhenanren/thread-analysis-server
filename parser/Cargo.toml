@@ -1,0 +1,15 @@
+[package]
+name = "parser"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+common = {path = "../common"}
+domain = {path = "../domain"}
+
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# 并行处理集合
+rayon.workspace = true
+

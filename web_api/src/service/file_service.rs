@@ -4,11 +4,10 @@ use common::{error::AnalysisError, file_utils, model::file_info::FileInfo};
 use db::{db_access::{db_cpu, db_file, db_memeory, db_stack, db_thread, db_worksapce}, workspace::DBFileWorkSpace};
 use domain::{db::{db::ModelTransfer, db_cpu::DBCpu, db_file::DBSourceFile, db_memory::DBMemory, db_stack::DBStack, db_thread::DBThreadInfo}, model::thread::{StackDumpInfo, ThreadStatus}};
 use itertools::Itertools;
+use parser::parse::{CpuParser, MemoryParser, ParseFile, ThreadParser};
 use rayon::prelude::*;
 use sqlx::{SqlitePool};
 use task::async_task::ExecuteContext;
-
-use crate::file::parse::{CpuParser, MemoryParser, ParseFile, ThreadParser};
 
 
 /// 分析文件夹或者文件中的线程信息,并生成到数据库中
@@ -40,6 +39,7 @@ pub async fn analysis(pool: &SqlitePool, path: &str, context: &ExecuteContext) -
     let threads_map = ThreadParser::parse(path, &files)?;
     context.update_progress(25.0, Some("解析内存文件".to_string())).await;
     let memory_info = MemoryParser::parse(path, &files)?;
+    
     context.update_progress(30.0, Some("写入文件信息".to_string())).await;
     db_file::batch_add(
         pool,

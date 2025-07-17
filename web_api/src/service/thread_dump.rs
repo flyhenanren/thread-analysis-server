@@ -2,9 +2,8 @@ use std::collections::HashMap;
 use common::error::AnalysisError;
 use db::db_access::{db_file, db_thread};
 use domain::model::thread::{PoolThreads, StatusCount, StatusQuery, ThreadContent, ThreadDetail, ThreadStatus, ThreadsQuery};
+use indexer::idx::index;
 use sqlx::SqlitePool;
-
-use crate::file;
 
 
 
@@ -168,7 +167,7 @@ pub async fn get_thread_content(pool: &SqlitePool, thread_id: &str) -> Result<Th
     match db_file::get_file_by_thread(pool, &thread_id).await{
         Ok(file_info) => {
             let content = if file_info.end_line - file_info.start_line > 2  {
-                file::index::read_lines_from_file(&file_info.file_path, (file_info.start_line  + 2) as usize, file_info.end_line as usize)?
+                index::read_lines_from_file(&file_info.file_path, (file_info.start_line  + 2) as usize, file_info.end_line as usize)?
             }else{
                 vec![]
             };

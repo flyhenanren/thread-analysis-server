@@ -16,8 +16,6 @@ mod handlers;
 mod resp;
 #[path = "../service/mod.rs"]
 mod service;
-#[path = "../file/mod.rs"]
-mod file;
 #[path = "../task/mod.rs"]
 mod executor;
 
