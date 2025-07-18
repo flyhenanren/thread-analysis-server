@@ -838,6 +838,8 @@ dependencies = [
  "actix-web",
  "chrono",
  "common",
+ "config",
+ "dotenv",
  "lazy_static",
  "rayon",
  "regex",
@@ -2745,6 +2747,7 @@ name = "task"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "domain",
  "futures",
  "log",
  "serde",
@@ -3129,7 +3132,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "common",
- "config",
  "db",
  "domain",
  "dotenv",

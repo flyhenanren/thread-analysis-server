@@ -1,9 +1,9 @@
 use std::{fs, path::{Path, PathBuf}};
 
+use domain::config::LogConfig;
 use fern::Dispatch;
 use log::LevelFilter;
 
-use crate::config::LogConfig;
 
 pub fn setup_logger(log_cfg: LogConfig) -> Result<(), fern::InitError> {
       // 自动创建日志目录

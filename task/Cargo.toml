@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+domain = {path = "../domain"}
+
 serde.workspace = true
 
 # 异步任务框架

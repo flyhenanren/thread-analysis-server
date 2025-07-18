@@ -112,7 +112,6 @@ impl AppConfig {
     }
 }
 
-#[derive(Clone)]
 pub struct SharedConfig {
     default: AppConfig,
     user: Arc<RwLock<PartialAppConfig>>,

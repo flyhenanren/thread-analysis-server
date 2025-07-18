@@ -1,10 +1,12 @@
 use actix_web::{web, App, HttpServer};
 use db::connection::establish_connection;
+
+use domain::{config::{AppConfig, SharedConfig}, context::Context};
 use task::async_task::TaskExecutor;
 use std::{io, net::ToSocketAddrs};
 use log::*;
 
-use crate::{config::{AppConfig, SharedConfig}, logger::setup_logger, router::{file_routes, general_routers}, state::AppState};
+use crate::{logger::setup_logger, router::{file_routes, general_routers}, state::{AppState}};
 
 #[path = "../state.rs"]
 mod state;
@@ -21,8 +23,6 @@ mod executor;
 
 #[path = "../model/mod.rs"]
 mod model;
-#[path = "../config.rs"]
-mod config;
 #[path = "../logger.rs"]
 mod logger;
 
@@ -39,13 +39,15 @@ async fn main() -> io::Result<()> {
     let pool: sqlx::Pool<sqlx::Sqlite> = establish_connection().await;
     // 异步任务执行器
     let executor: TaskExecutor = TaskExecutor::new();
+    let context = Context {
+        pool,
+        shared_config,
+    };
     // 初始化共享数据
     let shared_data = web::Data::new(AppState {
-        pool,
+        context,
         executor,
-        shared_config
     });
-
     let app = move || {
         App::new()
             .app_data(shared_data.clone()) // 将数据绑定到内存中

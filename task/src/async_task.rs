@@ -1,3 +1,4 @@
+use domain::context::Context;
 use serde::Serialize;
 use sqlx::SqlitePool;
 use std::{collections::HashMap, sync::Arc};
@@ -80,7 +81,7 @@ pub struct TaskHandle {
 pub trait AsyncTask {
     async fn execute(&self, context: &ExecuteContext) -> Result<String, String>;
 }
-
+#[derive(Clone)]
 pub struct TaskExecutor {
     tasks: Arc<Mutex<HashMap<String, TaskHandle>>>,
 }
@@ -96,7 +97,7 @@ impl TaskExecutor {
         &self,
         task_id: &str,
         task: T,
-        pool: Option<SqlitePool>,
+        context: &Context,
         param: Option<String>
     ) {
         // 创建进度更新通道
@@ -141,15 +142,15 @@ impl TaskExecutor {
             }
         });
         // 启动任务执行
-        let context = ExecuteContext {
-            pool,
+        let execute_context = ExecuteContext {
+            pool:Some(context.pool.clone()),
             channel: progress_tx,
             param
         };
         tokio::spawn(async move {
-          match task.execute(&context).await{
-            Ok(value) => context.complate( None, Some(value.clone())).await,
-            Err(err) => context.fail(Some(err)).await,
+          match task.execute(&execute_context).await{
+            Ok(value) => execute_context.complate( None, Some(value.clone())).await,
+            Err(err) => execute_context.fail(Some(err)).await,
           }
         });
     }
