@@ -24,7 +24,31 @@ impl AsyncTask for ParseFileAsyncTask{
     }
 }
 
-/// 分析文件夹或者文件中的线程信息,并生成到数据库中
+/// 分析文件夹或者文件中的线程信息，根据不同的模式写入到不同的缓存中
+/// # Arguments
+/// * `pool` - 数据库连接池
+/// * `path` - 文件或文件夹的路径
+/// * `context` - 执行上下文，包含进度更新和其他执行
+/// # Returns
+/// * `Result<String, AnalysisError>` - 返回工作空间的 ID 或错误信息
+/// # asynchronous
+/// 此函数是异步的，使用 `async` 和 `await` 语法
+/// # Errors
+/// * 如果文件类型无法识别，或者在解析过程中发生错误，将返回 `Analysis
+/// Error`
+/// # Example
+/// ```rust
+/// let pool = establish_connection().await;
+/// let path = "path/to/file_or_directory";
+/// let context = ExecuteContext::new(pool, channel, param);
+/// let result = analysis(&pool, path, &context).await;
+/// ```
+/// # Note
+/// 此函数会根据文件类型决定是直接读取文件还是解压缩后读取，并且会更新执行上下文中的进度信息。
+/// 如果是压缩文件，将会解压缩到指定的工作空间中，并解析其中的 CPU、线程和内存信息。
+/// 最终将解析结果写入到数据库中。
+/// # Panics
+/// 如果在读取文件或解压缩过程中发生错误，将会触发 panic。
 async fn analysis(pool: &SqlitePool, path: &str, context: &ExecuteContext) -> Result<String, AnalysisError> {
     let file_type: u8 =
         file_utils::get_file_type(path).map_err(|e| AnalysisError::ParseError(e.to_string()))?;
