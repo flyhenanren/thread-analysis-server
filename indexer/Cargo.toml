@@ -8,3 +8,4 @@ common = {path = "../common"}
 
 tantivy.workspace = true
 regex.workspace = true
+fxhash.workspace = true

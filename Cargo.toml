@@ -57,6 +57,9 @@ config = "0.13"
 
 #全文检索
 tantivy = "0.24"  # 使用最新版本
+
+#hash库
+fxhash = "0.2"
 # 对于 Windows 系统，设置 `--windows-subsystem=windows` 隐藏控制台窗口
 [profile.release]
 link_args = ["-subsystem:windows"]
