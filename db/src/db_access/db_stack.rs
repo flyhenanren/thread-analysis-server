@@ -1,5 +1,4 @@
 use common::error::DBError;
-use domain::db::db_stack::DBStack;
 use futures::future::join_all; // 在文件顶部添加这个导入
 
 use std::sync::Arc;
@@ -8,11 +7,9 @@ use sqlx::{SqlitePool, Transaction};
 use tokio::sync::mpsc::{self, Sender, Receiver};
 
 
-
-
-pub async fn batch_add(pool: &SqlitePool, threads: &Vec<DBStack>) -> Result<(), DBError> {
+pub async fn batch_add(pool: &SqlitePool, threads: &Vec<String>) -> Result<(), DBError> {
     let _ = adjust_config(pool).await;
-    let (tx, rx): (Sender<ParamValues<DBStack>>, Receiver<ParamValues<DBStack>>) = mpsc::channel(100);
+    let (tx, rx): (Sender<ParamValues<String>>, Receiver<ParamValues<String>>) = mpsc::channel(100);
    
     let cpu_count = num_cpus::get();
     let arc_pool = Arc::new(pool.clone());
@@ -78,20 +75,14 @@ where
 }
 
 
-fn execute_batch_add(pool: Arc<SqlitePool>, threads: Vec<DBStack>) -> tokio::task::JoinHandle<Result<(), DBError>> {
+fn execute_batch_add(pool: Arc<SqlitePool>, threads: Vec<String>) -> tokio::task::JoinHandle<Result<(), DBError>> {
     tokio::spawn(async move {
         let mut transaction: Transaction<'_, sqlx::Sqlite> = pool.begin().await?;
         let insert_sql = String::from(r#"INSERT INTO THREAD_STACK (ID, WORKSPACE, THREAD_ID, CLASS_NAME, METHOD_NAME, METHOD_LINE, STACK_STATUS)
             VALUES (?,?,?,?,?,?,?)"#);
         for stack in threads {
             sqlx::query(&insert_sql)
-            .bind(stack.id.clone())
-            .bind(stack.work_space.clone())
-            .bind(stack.thread_id.clone())
-            .bind(stack.class_name.clone())
-            .bind(stack.method_name.clone())
-            .bind(stack.method_lin)
-            .bind(stack.stack_status.clone())
+            .bind(stack)
             .execute(&mut *transaction)
             .await?;
         }
@@ -104,29 +95,5 @@ async fn adjust_config(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     sqlx::query("PRAGMA synchronous = OFF;").execute(pool).await?;
     sqlx::query("PRAGMA journal_mode = OFF;").execute(pool).await?;
     sqlx::query("PRAGMA temp_store = MEMORY;").execute(pool).await?;
-    Ok(())
-}
-
-pub async fn list(pool: &SqlitePool, work_space:&str) -> Result<Vec<DBStack>, DBError> {
-    let stack = sqlx::query_as::<_, DBStack>("SELECT * FROM THREAD_STACK WHERE WORKSPACE = ?")
-        .bind(work_space)
-        .fetch_all(pool)
-        .await?;
-    Ok(stack)
-}
-
-pub async fn get(pool: &SqlitePool, id: i32) -> Result<DBStack, DBError> {
-    let work_sapce =
-        sqlx::query_as::<_, DBStack>("SELECT * FROM THREAD_STACK WHERE ID = ?")
-            .bind(id)
-            .fetch_one(pool)
-            .await?;
-    Ok(work_sapce)
-}
-
-pub async fn delete_all(pool: &SqlitePool) -> Result<(), DBError> {
-    sqlx::query("DELETE FROM THREAD_STACK")
-        .execute(pool)
-        .await?;
     Ok(())
 }

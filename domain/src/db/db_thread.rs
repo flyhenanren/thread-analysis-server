@@ -1,6 +1,7 @@
 
 use common::string_utils::rand_id;
 use serde::Serialize;
+use serde_json::to_string;
 use sqlx::FromRow;
 
 use crate::model::thread::Thread;
@@ -34,8 +35,10 @@ pub struct DBThreadInfo {
     pub start_line: i64,
     #[sqlx(rename = "END_LINE")]
     pub end_line: i64,
-    #[sqlx(rename = "METHOD_NAME")]
+    #[sqlx(rename = "TOP_METHOD")]
     pub method_name: String,
+    #[sqlx(rename = "STACK_INFO")]
+    pub stack_info: String,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -72,6 +75,7 @@ impl DBThreadInfo{
           start_line: thread.start,
           end_line: thread.end,
           method_name: thread.frames.first().and_then(|frame| frame.method_name.clone()).unwrap_or_default(),
+          stack_info: thread.frames.iter().map(|frame| to_string(&frame.frame).unwrap()).collect::<Vec<String>>().join("\n"),
       }
   }
 }

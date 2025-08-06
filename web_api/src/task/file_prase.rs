@@ -1,12 +1,11 @@
 use std::path::Path;
-use chrono::Local;
+use storage::writer::{LocalWriter, Writer};
 use task::async_task::{AsyncTask, ExecuteContext};
 
 use common::{error::AnalysisError, file_utils, model::file_info::FileInfo};
-use db::{db_access::{db_cpu, db_file, db_memeory, db_stack, db_thread, db_worksapce}, workspace::DBFileWorkSpace};
-use domain::{db::{db::ModelTransfer, db_cpu::DBCpu, db_file::DBSourceFile, db_memory::DBMemory, db_stack::DBStack, db_thread::DBThreadInfo}};
+use db::{db_access::{db_file, db_worksapce}, workspace::DBFileWorkSpace};
+use domain::db::{db::ModelTransfer, db_file::DBSourceFile};
 use parser::parse::{CpuParser, MemoryParser, ParseFile, ThreadParser};
-use rayon::prelude::*;
 use sqlx::{SqlitePool};
 
 pub struct ParseFileAsyncTask;
@@ -89,50 +88,11 @@ async fn analysis(pool: &SqlitePool, path: &str, context: &ExecuteContext) -> Re
     )
     .await?;
     context.update_progress(35.0, Some("写入CPU信息".to_string())).await;
-    db_cpu::batch_add(
-        pool,
-        cpu_info
-            .into_iter()
-            .map(|info| DBCpu::new(&info, &info.file_id, &work_space.id))
-            .collect(),
-        path,
-    )
-    .await?;
-    context.update_progress(40.0, Some("解析线程信息".to_string())).await;
-    let work_space_id = &work_space.id;
-    let threads_count = threads_map
-        .into_par_iter()
-        .flat_map(|(key, value)| {
-            value.into_par_iter().map(move |thread| {
-                let thread_info = DBThreadInfo::new(&thread, &key);
-                // 先将 ThreadStack 创建并收集
-                let stack = DBStack::new(&thread, &thread_info.id, &work_space_id);
-                // 收集完所有的 stack_info，返回值包含 thread_info 和 stack
-                (thread_info, stack)
-            })
-        })
-        .collect::<Vec<(DBThreadInfo, Vec<DBStack>)>>();
-    
-    // 分离 ThreadInfo 和 ThreadStack 的集合
-    let mut stack_info = Vec::new();
-    let mut threads_info = Vec::new();
-    for (thread_info, stack) in threads_count {
-        stack_info.extend(stack); // 将所有的 stack 扩展到 stack_info 中
-        threads_info.push(thread_info);
-    }
+    LocalWriter::write_cpu(pool, &work_space.id, &cpu_info).await?;
     context.update_progress(50.0, Some("写入线程信息".to_string())).await;
-    db_thread::batch_add(pool, threads_info, &work_space.id).await?;
-    context.update_progress(65.0, Some("写入堆栈信息".to_string())).await;
-    db_stack::batch_add(pool, &stack_info).await?;
+    LocalWriter::write_threads(pool, &work_space.id, &threads_map).await?;
     context.update_progress(95.0, Some("写入内存信息".to_string())).await;
-    db_memeory::batch_add(
-        pool,
-        &memory_info
-            .into_iter()
-            .map(|mem| DBMemory::new(&mem, &work_space.id))
-            .collect(),
-    )
-    .await?;
+    LocalWriter::write_memory(pool, &work_space.id, &memory_info).await?;
     context.update_progress(100.0, Some("解析完成".to_string())).await;
     Ok(work_space.id)
 }

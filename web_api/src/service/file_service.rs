@@ -1,7 +1,7 @@
 use std::{collections::HashMap};
 
 use common::{error::AnalysisError};
-use db::{db_access::{db_cpu, db_file, db_memeory, db_stack, db_thread, db_worksapce}, workspace::DBFileWorkSpace};
+use db::{db_access::{db_cpu, db_file, db_memeory, db_thread, db_worksapce}, workspace::DBFileWorkSpace};
 use domain::{db::{db_file::DBSourceFile, db_thread::DBThreadInfo}, model::thread::{StackDumpInfo, ThreadStatus}};
 use itertools::Itertools;
 use sqlx::{SqlitePool};
@@ -61,7 +61,7 @@ pub async fn clean_work_space(pool: &SqlitePool) -> Result<bool, AnalysisError>{
     db_memeory::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除内存信息出错：{:?}", err));
     db_cpu::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除CPU信息出错：{:?}", err));
     db_thread::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除线程信息出错：{:?}", err));
-    db_stack::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除堆栈信息出错：{:?}", err));
+    // db_stack::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除堆栈信息出错：{:?}", err));
     Ok(true)
 }
 

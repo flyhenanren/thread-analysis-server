@@ -4,4 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+db = { path = "../db" }
+domain = {path = "../domain"}
+common = { path = "../common" }
 
+sqlx.workspace = true
+rayon.workspace = true

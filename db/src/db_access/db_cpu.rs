@@ -4,14 +4,14 @@ use sqlx::{SqlitePool, Transaction};
 
 
 
-pub async fn batch_add(pool: &SqlitePool, cpu_infos: Vec<DBCpu>, work_space: &str) -> Result<(), DBError> {
+pub async fn batch_add(pool: &SqlitePool, cpu_infos: Vec<DBCpu>) -> Result<(), DBError> {
     let transaction: Transaction<'_, sqlx::Sqlite> = pool.begin().await?;
     for info in cpu_infos {
         sqlx::query(
             r#"INSERT INTO CPU_INFO (id,workspace, exe_time, us, sy, ids, tasks, running, sleeping, mem_total, mem_free, mem_used)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "#)
              .bind(info.id)
-             .bind(work_space)
+             .bind(info.workspace)
             .bind(info.exe_time)
             .bind(info.us)
             .bind(info.sy)
