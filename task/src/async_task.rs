@@ -21,7 +21,7 @@ impl ExecuteContext {
             let _ = self.channel.send((Some(clamped), message, Some(TaskPhase::Running), None)).await;
             return;
         }
-        log::info!("更新进度,progress:{}", value);
+        log::info!("更新进度,progress:{}, value:{:?}", value, message);
         // 发送进度更新
         let _ = self.channel.send((Some(value), message, None, None)).await;
         

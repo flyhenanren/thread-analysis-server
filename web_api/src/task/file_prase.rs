@@ -19,7 +19,10 @@ impl AsyncTask for ParseFileAsyncTask{
         let path = context.param.as_ref().ok_or("err")?;
         match analysis(&pool, &path, context).await{
             Ok(result) => Ok(result),
-            Err(err) => Err(err.to_string()),
+            Err(err) => {
+                log::error!("构建堆栈信息失败:{:?}", err);
+                Err(err.to_string())
+            }
         }
     }
 }

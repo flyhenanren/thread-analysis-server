@@ -8,8 +8,10 @@ pub async fn list_dump_handler(
     app_state: web::Data<AppState>,
     work_space_id: web::Path<String>,
 ) -> Result<HttpResponse, AnalysisError> {
-    let files = file_service::list_dump_file(&app_state.context.pool, &work_space_id).await?;
-    Ok(HttpResponse::Ok().json(ApiResponse::success(Some(files))))
+    match file_service::list_dump_file(&app_state.context.pool, &work_space_id).await{
+        Ok(files) => Ok(HttpResponse::Ok().json(ApiResponse::success(Some(files)))),
+        Err(err) => Ok(HttpResponse::Ok().json(ApiResponse::error(201, &format!("{:?}",err))))
+    }
 }
 
 pub async fn query_threads(

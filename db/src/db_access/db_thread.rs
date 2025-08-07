@@ -6,8 +6,7 @@ use sqlx::{SqlitePool};
 
 pub async fn batch_add(
     pool: &SqlitePool,
-    thread_infos: Vec<DBThreadInfo>,
-    work_space: &str,
+    thread_infos: Vec<DBThreadInfo>
 ) -> Result<(), DBError> {
     const BATCH_SIZE: usize = 1000; // 每个事务处理的最大记录数
     for chunk in thread_infos.chunks(BATCH_SIZE) {
@@ -17,13 +16,12 @@ pub async fn batch_add(
         // 构建批量插入的 SQL 语句
         let insert_query = String::from(
             r#"INSERT INTO THREAD_INFO 
-            (ID, WORKSPACE, FILE_ID, THREAD_ID, THREAD_NAME, DAEMON, PRIO, OS_PRIO, TID, NID, ADDRESS,THREAD_STATUS, START_LINE, END_LINE, METHOD_NAME) 
+            (ID, FILE_ID, THREAD_ID, THREAD_NAME, DAEMON, PRIO, OS_PRIO, TID, NID, ADDRESS,THREAD_STATUS, START_LINE, END_LINE, TOP_METHOD, STACK_INFO) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
         );
         for thread_info in chunk.iter() {
             sqlx::query(&insert_query)
                 .bind(thread_info.id.to_owned())
-                .bind(work_space.to_owned())
                 .bind(thread_info.file_id.to_owned())
                 .bind(thread_info.thread_id.clone().unwrap_or_default())
                 .bind(thread_info.thread_name.to_owned())
@@ -36,7 +34,8 @@ pub async fn batch_add(
                 .bind(thread_info.thread_status)
                 .bind(thread_info.start_line)
                 .bind(thread_info.end_line)
-                .bind(thread_info.method_name.to_owned())
+                .bind(thread_info.top_method.to_owned())
+                .bind(thread_info.stack_info.clone())
                 .execute(&mut *transaction)
                 .await?;
         }
@@ -50,7 +49,11 @@ pub async fn list_by_work_space(
     work_space_id: &str,
 ) -> Result<Vec<DBThreadInfo>, DBError> {
     let work_space =
-        sqlx::query_as::<_, DBThreadInfo>("SELECT * FROM THREAD_INFO WHERE WORKSPACE = ?")
+        sqlx::query_as::<_, DBThreadInfo>("SELECT T.* FROM THREAD_INFO T 
+                                                    LEFT JOIN FILE_INFO I
+                                                    ON T.FILE_ID = I.ID
+                                                    WHERE I.WORKSPACE = ?")
+
             .bind(work_space_id)
             .fetch_all(pool)
             .await?;

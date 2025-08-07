@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 common = { path = "../common" }
+indexer = { path = "../indexer" }
 
 chrono.workspace=true
 serde.workspace=true

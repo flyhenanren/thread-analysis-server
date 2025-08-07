@@ -248,8 +248,7 @@ impl ThreadStatus {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct CallFrame {
     pub class_name: String,
-    pub method_name: Option<String>,
-    pub line_number: Option<u32>,
+    pub signature: Option<String>,
     pub frame: Frame,
 }
 
@@ -259,11 +258,7 @@ impl CallFrame {
         if trim_info.starts_with("at") {
             if let Some(caps) = REGEX_FRAME.captures(frame_info) {
                 let class_name = caps[1].to_string();
-                let method_name = Some(format!("{}.{}", class_name, &caps[2]));
-                let line_number = caps
-                    .get(5)
-                    .map(|m| m.as_str().parse().expect("行号解析失败"));
-
+                let signature = Some(caps.get(0).unwrap().as_str().trim_start_matches("at ").trim().to_string());
                 let frame = if trim_info.contains("(Native Method)") {
                     Frame::NativeMethod
                 } else {
@@ -272,8 +267,7 @@ impl CallFrame {
 
                 return Ok(CallFrame {
                     class_name,
-                    method_name,
-                    line_number,
+                    signature,
                     frame,
                 });
             } else {
@@ -296,8 +290,7 @@ impl CallFrame {
             let frame = Frame::from_str(parts, frame_info)?;
             return Ok(CallFrame {
                 class_name,
-                method_name: None,
-                line_number: None,
+                signature: None,
                 frame,
             });
         }
@@ -542,7 +535,7 @@ impl ThreadDetail {
             name: info.thread_name.clone(),
             status: ThreadStatus::try_from(info.thread_status).unwrap(),
             nid: info.nid.clone(),
-            method: info.method_name.clone(),
+            method: info.top_method.clone(),
             stack_dep: info.end_line - info.start_line + 1,
         }
     }
@@ -568,20 +561,17 @@ pub mod tests {
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
-            method_name: Some("java.lang.Thread.run".to_string()),
-            line_number: Some(748),
+            signature: Some("java.lang.Thread.run(Thread.java:748)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "com.example.MyClass".to_string(),
-            method_name: Some("com.example.MyClass.run".to_string()),
-            line_number: Some(5),
+            signature: Some("com.example.MyClass.run(MyClass.java:5)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "com.example.MyClass".to_string(),
-            method_name: Some("com.example.MyClass.myMethod".to_string()),
-            line_number: Some(10),
+            signature: Some("com.example.MyClass.myMethod(MyClass.java:10)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.reverse();
@@ -616,20 +606,17 @@ pub mod tests {
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
-            method_name: Some("java.lang.Thread.run".to_string()),
-            line_number: Some(748),
+            signature: Some("java.lang.Thread.run(Thread.java:748)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "com.example.MyClass".to_string(),
-            method_name: Some("com.example.MyClass.run".to_string()),
-            line_number: Some(15),
+            signature: Some("com.example.MyClass.run(MyClass.java:15)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "java.lang.Object".to_string(),
-            method_name: None,
-            line_number: None,
+            signature: None,
             frame: Frame::Monitor {
                 monitor_address: 0x00000000c7c600d0,
                 action: MonitorAction::WaitingToLock,
@@ -637,8 +624,7 @@ pub mod tests {
         });
         frames.push(CallFrame {
             class_name: "com.example.MyClass".to_string(),
-            method_name: Some("com.example.MyClass.synchronizedMethod".to_string()),
-            line_number: Some(20),
+            signature: Some("com.example.MyClass.synchronizedMethod(MyClass.java:20)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.reverse();
@@ -676,40 +662,34 @@ pub mod tests {
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
-            method_name: Some("java.lang.Thread.run".to_string()),
-            line_number: Some(748),
+            signature: Some("java.lang.Thread.run(Thread.java:748)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "com.example.MyClass".to_string(),
-            method_name: Some("com.example.MyClass.run".to_string()),
-            line_number: Some(25),
+            signature: Some("com.example.MyClass.run(MyClass.java:25)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "java.lang.Object".to_string(),
-            method_name: None,
-            line_number: None,
+            signature: None,
             frame: Frame::Lock {
                 lock_address: 0x00000000c7c600d0,
             },
         });
         frames.push(CallFrame {
             class_name: "com.example.MyClass".to_string(),
-            method_name: Some("com.example.MyClass.waitMethod".to_string()),
-            line_number: Some(30),
+            signature: Some("com.example.MyClass.waitMethod(MyClass.java:30)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "java.lang.Object".to_string(),
-            method_name: Some("java.lang.Object.wait".to_string()),
-            line_number: Some(502),
+            signature: Some("java.lang.Object.wait(Object.java:502)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "java.lang.Object".to_string(),
-            method_name: None,
-            line_number: None,
+            signature: None,
             frame: Frame::Monitor {
                 monitor_address: 0x00000000c7c600d0,
                 action: MonitorAction::WaitingOn,
@@ -717,8 +697,7 @@ pub mod tests {
         });
         frames.push(CallFrame {
             class_name: "java.lang.Object".to_string(),
-            method_name: Some("java.lang.Object.wait".to_string()),
-            line_number: None,
+            signature: Some("java.lang.Object.wait(Native Method)".to_string()),
             frame: Frame::NativeMethod,
         });
         frames.reverse();
@@ -752,26 +731,22 @@ pub mod tests {
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
-            method_name: Some("java.lang.Thread.run".to_string()),
-            line_number: Some(748),
+            signature: Some("java.lang.Thread.run(Thread.java:748)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "com.example.MyClass".to_string(),
-            method_name: Some("com.example.MyClass.run".to_string()),
-            line_number: Some(35),
+            signature: Some("com.example.MyClass.run(MyClass.java:35)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "com.example.MyClass".to_string(),
-            method_name: Some("com.example.MyClass.sleepMethod".to_string()),
-            line_number: Some(40),
+            signature: Some("com.example.MyClass.sleepMethod(MyClass.java:40)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
-            method_name: Some("java.lang.Thread.sleep".to_string()),
-            line_number: None,
+            signature: Some("java.lang.Thread.sleep(Native Method)".to_string()),
             frame: Frame::NativeMethod,
         });
         frames.reverse();
@@ -808,40 +783,34 @@ pub mod tests {
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
-            method_name: Some("java.lang.Thread.run".to_string()),
-            line_number: Some(748),
+            signature: Some("java.lang.Thread.run(Thread.java:748)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "com.example.MyClass".to_string(),
-            method_name: Some("com.example.MyClass.run".to_string()),
-            line_number: Some(55),
+            signature: Some("com.example.MyClass.run(MyClass.java:55)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "java.lang.Object".to_string(),
-            method_name: None,
-            line_number: None,
+            signature: None,
             frame: Frame::Lock {
                 lock_address: 0x00000000c7c600d0,
             },
         });
         frames.push(CallFrame {
             class_name: "com.example.MyClass".to_string(),
-            method_name: Some("com.example.MyClass.timedWaitMethod".to_string()),
-            line_number: Some(60),
+            signature: Some("com.example.MyClass.timedWaitMethod(MyClass.java:60)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "java.lang.Object".to_string(),
-            method_name: Some("java.lang.Object.wait".to_string()),
-            line_number: Some(502),
+            signature: Some("java.lang.Object.wait(Object.java:502)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "java.lang.Object".to_string(),
-            method_name: None,
-            line_number: None,
+            signature: None,
             frame: Frame::Monitor {
                 monitor_address: 0x00000000c7c600d0,
                 action: MonitorAction::WaitingOn,
@@ -849,8 +818,7 @@ pub mod tests {
         });
         frames.push(CallFrame {
             class_name: "java.lang.Object".to_string(),
-            method_name: Some("java.lang.Object.wait".to_string()),
-            line_number: None,
+            signature: Some("java.lang.Object.wait(Native Method)".to_string()),
             frame: Frame::NativeMethod,
         });
         frames.reverse();
@@ -888,51 +856,44 @@ pub mod tests {
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
-            method_name: Some("java.lang.Thread.run".to_string()),
-            line_number: Some(748),
+            signature: Some("java.lang.Thread.run(Thread.java:748)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "com.example.MyClass".to_string(),
-            method_name: Some("com.example.MyClass.run".to_string()),
-            line_number: Some(65),
+            signature: Some("com.example.MyClass.run(MyClass.java:65)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "com.example.MyClass".to_string(),
-            method_name: Some("com.example.MyClass.timedConditionMethod".to_string()),
-            line_number: Some(70),
+            signature: Some("com.example.MyClass.timedConditionMethod(MyClass.java:70)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject"
                 .to_string(),
-            method_name: Some(
-                "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos"
+            signature: Some(
+                "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(AbstractQueuedSynchronizer.java:2078)"
                     .to_string(),
             ),
-            line_number: Some(2078),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "java.util.concurrent.locks.LockSupport".to_string(),
-            method_name: Some("java.util.concurrent.locks.LockSupport.parkNanos".to_string()),
-            line_number: Some(215),
+            signature: Some("java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject"
                 .to_string(),
-            method_name: None,
-            line_number: None,
+            signature: None,
             frame: Frame::Parking {
                 parking_address: 0x00000002a5bdfc00,
             },
         });
         frames.push(CallFrame {
             class_name: "sun.misc.Unsafe".to_string(),
-            method_name: Some("sun.misc.Unsafe.park".to_string()),
-            line_number: None,
+            signature: Some("sun.misc.Unsafe.park(Native Method)".to_string()),
             frame: Frame::NativeMethod,
         });
         frames.reverse();
@@ -970,51 +931,44 @@ pub mod tests {
         let mut frames: Vec<CallFrame> = Vec::new();
         frames.push(CallFrame {
             class_name: "java.lang.Thread".to_string(),
-            method_name: Some("java.lang.Thread.run".to_string()),
-            line_number: Some(748),
+            signature: Some("java.lang.Thread.run(Thread.java:748)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "com.example.MyClass".to_string(),
-            method_name: Some("com.example.MyClass.run".to_string()),
-            line_number: Some(45),
+            signature: Some("com.example.MyClass.run(MyClass.java:45)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "com.example.MyClass".to_string(),
-            method_name: Some("com.example.MyClass.conditionMethod".to_string()),
-            line_number: Some(50),
+            signature: Some("com.example.MyClass.conditionMethod(MyClass.java:50)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject"
                 .to_string(),
-            method_name: Some(
-                "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await"
+            signature: Some(
+                "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)"
                     .to_string(),
             ),
-            line_number: Some(2039),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "java.util.concurrent.locks.LockSupport".to_string(),
-            method_name: Some("java.util.concurrent.locks.LockSupport.park".to_string()),
-            line_number: Some(175),
+            signature: Some("java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)".to_string()),
             frame: Frame::MethodCall,
         });
         frames.push(CallFrame {
             class_name: "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject"
                 .to_string(),
-            method_name: None,
-            line_number: None,
+            signature: None,
             frame: Frame::Parking {
                 parking_address: 0x00000002a5bdfc00,
             },
         });
         frames.push(CallFrame {
             class_name: "sun.misc.Unsafe".to_string(),
-            method_name: Some("sun.misc.Unsafe.park".to_string()),
-            line_number: None,
+            signature: Some("sun.misc.Unsafe.park(Native Method)".to_string()),
             frame: Frame::NativeMethod,
         });
         frames.reverse();

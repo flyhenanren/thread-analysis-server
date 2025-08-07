@@ -1,65 +1,94 @@
-use std::{collections::HashMap};
+use std::{collections::{hash_map::Entry, HashMap}, sync::Arc};
+
+use indexer::cache::pool::StringPool;
 
 use crate::model::thread::{CallFrame, Frame, Thread};
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct CallTree {
-    method_name: String,
-    line: u32,
-    count: u32,
-    next: Option<Vec<Box<CallTree>>>,
+    method_name: Arc<str>,
+    samples: u32,
+    threads: Vec<Arc<str>>,
+    times: Vec<Arc<str>>,
+    next: Option<Vec<Arc<CallTree>>>,
 }
 
 impl CallTree {
-    pub fn new(threads: Vec<Thread>) -> Vec<CallTree> {
-        let mut root: HashMap<String, CallTree> = HashMap::new();
+    pub fn new(threads: Vec<Thread>) -> Vec<Arc<CallTree>> {
+        let mut root: HashMap<Arc<str>, Arc<CallTree>> = HashMap::new();
         for thread in threads {
-            if thread.frames.len() > 0 {
-                Self::convert_to_call_tree(thread, &mut root);    
+            if !thread.frames.is_empty() {
+                Self::convert_to_call_tree(thread, &mut root);
             }
         }
         root.into_values().collect()
     }
 
-    fn convert_to_call_tree(thread: Thread, root: &mut HashMap<String, CallTree>) {
-        let mut path: Vec<CallFrame> = thread.frames;
-        if let Some(root_frame) = path.pop() {
+    /// 将单个线程的调用帧插入到调用树根节点集合中。
+    /// 如果根节点已存在则合并采样，否则新建根节点。
+    fn convert_to_call_tree(thread: Thread, root: &mut HashMap<Arc<str>, Arc<CallTree>>) {
+        let mut frames: Vec<CallFrame> = thread.frames;
+        if let Some(root_frame) = frames.pop() {
             if let Frame::MethodCall = &root_frame.frame {
-                let method_name = root_frame.method_name.clone().unwrap_or_default();
-                let line = root_frame.line_number.unwrap_or_default();
-                let root_node: &mut CallTree = root.entry(method_name.clone()).or_insert(CallTree {
-                    method_name,
-                    line,
-                    count: 0,
-                    next: None,
-                });
-                root_node.count += 1;
-                Self::build_tree_from_frames(path, root_node);
+                let method_name = StringPool::get_arc_str(root_frame.signature.unwrap().as_str());
+                let threads: Vec<Arc<str>> = vec![]; // 线程名集合（可扩展）
+                let times: Vec<Arc<str>> = vec![];   // 时间点集合（可扩展）
+                // 先分离借用，避免可变借用冲突
+                match root.entry(method_name.clone()) { // 查找或插入根节点
+                    Entry::Occupied(mut e) => {
+                        Self::build_tree_from_frames(frames, Arc::make_mut(e.get_mut()));
+                    }
+                    Entry::Vacant(v) => {
+                        let arc = Arc::new(CallTree {
+                            method_name: method_name.clone(),
+                            samples: 0,
+                            threads: threads.clone(),
+                            times: times.clone(),
+                            next: None,
+                        });
+                        Self::build_tree_from_frames(frames, Arc::make_mut(v.insert(arc)));
+                    }
+                }
             }
         }
     }
+
     fn build_tree_from_frames(mut frames: Vec<CallFrame>, parent_node: &mut CallTree) {
+        parent_node.samples += 1;
         if let Some(frame) = frames.pop() {
-            let method_name = frame.method_name.as_ref().unwrap_or(&String::new()).clone();
-            let next_nodes = parent_node.next.get_or_insert_with(Vec::new);
-            let existing_node = next_nodes
-                .iter_mut()
-                .find(|node| node.method_name == method_name);
-            if let Some(node) = existing_node {
-                node.count += 1;
-                Self::build_tree_from_frames(frames, node);
-            } else {
-                let mut new_node = CallTree {
-                    method_name: method_name.clone(),
-                    line: frame.line_number.unwrap_or_default(),
-                    count: 1,
-                    next: None,
-                };
-                Self::build_tree_from_frames(frames, &mut new_node);
-                next_nodes.push(Box::new(new_node));
+            if !matches!(frame.frame, Frame::MethodCall) {
+               return;
             }
-        };
+             let method_name = StringPool::get_arc_str(frame.signature.unwrap().as_str());
+                let next_nodes = parent_node.next.get_or_insert_with(Vec::new);
+                // 查找下一个节点是否已存在（同名方法）
+                let mut found_idx = None;
+                for (i, node) in next_nodes.iter().enumerate() {
+                    // 如果已存在同名方法节点，记录下标
+                    if node.method_name == method_name {
+                        found_idx = Some(i);
+                        break;
+                    }
+                }
+                if let Some(idx) = found_idx {
+                    // 已存在该方法节点，递归进入并累加采样
+                    let mut_node = Arc::make_mut(&mut next_nodes[idx]);
+                    Self::build_tree_from_frames(frames, mut_node);
+                } else {
+                    // 不存在则新建节点，采样数初始为0，递归会+1
+                    let mut new_node = CallTree {
+                        method_name: method_name.clone(), // 方法名
+                        samples: 0, // 递归会+1
+                        threads: vec![], // 可根据需要填充
+                        times: vec![],   // 可根据需要填充
+                        next: None,      // 子节点
+                    };
+                    // 递归构建子路径
+                    Self::build_tree_from_frames(frames, &mut new_node);
+                    // 新节点加入当前节点的子节点列表
+                    next_nodes.push(Arc::new(new_node));
+                }
+        }
     }
 }
 
@@ -75,7 +104,7 @@ pub mod tests {
     #[test]
     pub fn test() {
         let real_start = Local::now();
-        let dirs = fs::read_dir("D:\\dump\\a").unwrap();
+        let dirs = fs::read_dir("D:\\dump\\20241029\\all_threaddump").unwrap();
         let mut threads = Vec::new();
         let mut count_file = 0;
         let mut count_threads = 0;
@@ -136,6 +165,5 @@ pub mod tests {
         build_end.timestamp_millis(), 
         build_end.timestamp_millis() - build_start.timestamp_millis(),
         build_end.timestamp_millis()- real_start.timestamp_millis());
-
     }
 }

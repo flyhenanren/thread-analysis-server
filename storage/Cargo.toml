@@ -10,3 +10,4 @@ common = { path = "../common" }
 
 sqlx.workspace = true
 rayon.workspace = true
+log.workspace = true

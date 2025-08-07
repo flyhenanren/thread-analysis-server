@@ -22,6 +22,7 @@ impl Writer for LocalWriter{
     async fn write_threads(pool: &SqlitePool, workspace_id: &str, threads_map: &HashMap<String, Vec<Thread>>) -> Result<(),AnalysisError> {
         DBWriter::write_threads(pool, workspace_id, threads_map).await?;
         Ok(())
+      
     }
 
     async fn write_cpu(pool: &SqlitePool, workspace_id: &str, cpus: &Vec<Cpu>) -> Result<(), AnalysisError> {
@@ -37,7 +38,7 @@ impl Writer for LocalWriter{
 
 impl Writer for DBWriter {
 
-    async fn write_threads(pool: &SqlitePool, workspace_id: &str, threads_map: &HashMap<String, Vec<Thread>>) -> Result<(), AnalysisError> {
+    async fn write_threads(pool: &SqlitePool, _workspace_id: &str, threads_map: &HashMap<String, Vec<Thread>>) -> Result<(), AnalysisError> {
       let db_threads = threads_map
         .into_par_iter()
         .flat_map(|(key, value)| {
@@ -46,7 +47,7 @@ impl Writer for DBWriter {
             })
         })
         .collect::<Vec<DBThreadInfo>>();
-      db_thread::batch_add(pool, db_threads, workspace_id).await?;
+        db_thread::batch_add(pool, db_threads).await?;
       Ok(())
     }
 
