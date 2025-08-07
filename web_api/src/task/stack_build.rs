@@ -1,5 +1,6 @@
 use db::db_access::db_thread;
 use domain::model::{stack::CallTree, thread::Thread};
+use indexer::cache::global::GlobalCache;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use task::async_task::{AsyncTask, ExecuteContext};
 
@@ -19,6 +20,8 @@ impl AsyncTask for BuildCacheAsyncTask{
             .map(|ele| ele.to_thread())
             .collect();
         let tree = CallTree::new(threads);
+        GlobalCache::put(workspace.to_string(), tree);
+        context.update_progress(1.0, Some("缓存构建完成".to_string())).await;
         Ok("".to_string())
     }
 }

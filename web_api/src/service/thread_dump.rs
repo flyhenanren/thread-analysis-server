@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use chrono::Local;
 use common::error::AnalysisError;
 use db::db_access::{db_file, db_thread};
 use domain::model::thread::{PoolThreads, StatusCount, StatusQuery, ThreadContent, ThreadDetail, ThreadStatus, ThreadsQuery};

@@ -1,7 +1,7 @@
 
 use actix_web::web;
 
-use crate::handlers::{async_task::query_task_process, cpu::cpu_used_count, file::{clean_open_file, list_work_space, load_file_handler}, general::health_check_handler, thread::{count_file_status, count_file_threads, count_thread_status, get_thread_content, list_dump_handler, query_threads}};
+use crate::handlers::{async_task::query_task_process, cpu::cpu_used_count, file::{clean_open_file, list_work_space, load_file_handler, load_file_workspace}, general::health_check_handler, thread::{count_file_status, count_file_threads, count_thread_status, get_thread_content, list_dump_handler, query_threads}};
 
 
 pub fn general_routers(cfg: &mut web::ServiceConfig) {
@@ -16,6 +16,7 @@ pub fn file_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/file")
             .route("/open", web::post().to(load_file_handler))
             .route("/list", web::get().to(list_work_space))
+            .route("/load/{work_space_id}", web::get().to(load_file_workspace))
             .route("/clean", web::get().to(clean_open_file))
     )
     .service(

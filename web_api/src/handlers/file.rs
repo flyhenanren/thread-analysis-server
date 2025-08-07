@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse};
 use common::{error::AnalysisError, string_utils::rand_id};
 
-use crate::{ executor::file_prase::ParseFileAsyncTask, resp::ApiResponse, service::file_service, state::AppState};
+use crate::{ executor::{file_prase::ParseFileAsyncTask, stack_build::BuildCacheAsyncTask}, resp::ApiResponse, service::file_service, state::AppState};
 
 /// 将文件内容解析为工作空间，并存储到数据库中
 /// # Arguments
@@ -18,8 +18,9 @@ use crate::{ executor::file_prase::ParseFileAsyncTask, resp::ApiResponse, servic
 /// let response = load_file_handler(app_state, path).await;
 /// ```
 /// # Note
-/// 此函数会检查工作空间是否已存在，如果不存在，则提交一个异步任务来解析文件。
-/// 如果工作空间已存在，则直接返回成功响应。
+/// 此函数会加载指定文件，
+/// 如果在该位置工作空间已存在，则直接返回成功响应。
+/// 如果在该位置工作空间不存在，则会创建一个新的工作空间，并将文件内容解析为线程信息。
 /// # Panics
 /// 如果在解析文件或查询工作空间时发生错误，将触发 panic。
 /// # Asynchronous
@@ -98,4 +99,16 @@ pub async fn clean_open_file(
         Ok(_) => Ok(HttpResponse::Ok().json(ApiResponse::ok())),
         Err(err) => Ok(HttpResponse::Ok().json(ApiResponse::error(500, &format!("清理工作空间异常：{}", err))))
     }
+}
+
+/// 加载指定工作空间的文件到内存中
+/// # Arguments
+/// * `app_state` - 应用状态，包含数据库连接池和其他共享资源        
+/// * `work_space_id` - 工作空间的唯一标识符
+pub async fn load_file_workspace( 
+    app_state: web::Data<AppState>,
+    work_space_id: web::Path<String>) -> Result<HttpResponse, AnalysisError> {
+        let task_id = rand_id();
+        app_state.executor.submit_task(&task_id, BuildCacheAsyncTask, &app_state.context, Some(work_space_id.clone())).await;
+    Ok(HttpResponse::Ok().json(ApiResponse::success(Some(task_id.to_string()))))
 }

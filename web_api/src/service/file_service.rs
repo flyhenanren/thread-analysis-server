@@ -7,6 +7,11 @@ use itertools::Itertools;
 use sqlx::{SqlitePool};
 
 /// 获取所有线程文件信息
+/// # Arguments
+/// * `pool` - 数据库连接池 
+/// * `work_space_id` - 工作空间的唯一标识符
+/// # Returns   
+///     * `Result<Vec<StackDumpInfo>, AnalysisError>` - 返回线程文件信息列表
 pub async fn list_dump_file(pool: &SqlitePool, work_space_id: &str) -> Result<Vec<StackDumpInfo>, AnalysisError> {
     return match db_worksapce::get(pool, work_space_id).await? {
         Some(work_space) => {
@@ -45,23 +50,25 @@ pub async fn list_dump_file(pool: &SqlitePool, work_space_id: &str) -> Result<Ve
     }
 }
 
+/// 检查工作空间是否已经创建
 pub async fn exist_work_space(pool: &SqlitePool, path: &str) -> Result<bool, AnalysisError> {
     Ok(db_worksapce::get_by_path(pool, path).await?.is_some())
 }
 
+/// 列出所有工作空间
 pub async fn list_work_space(pool: &SqlitePool) -> Result<Vec<DBFileWorkSpace>, AnalysisError> {
     let mut work_space = db_worksapce::list(pool).await?;
     work_space.sort_by(|a, b| b.create_time.cmp(&a.create_time));
     Ok(work_space)
 }
 
+/// 清理工作空间
 pub async fn clean_work_space(pool: &SqlitePool) -> Result<bool, AnalysisError>{
     db_worksapce::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除工作空间出错：{:?}", err));
     db_file::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除文件信息出错：{:?}", err));
     db_memeory::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除内存信息出错：{:?}", err));
     db_cpu::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除CPU信息出错：{:?}", err));
     db_thread::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除线程信息出错：{:?}", err));
-    // db_stack::delete_all(pool).await.unwrap_or_else(|err| log::error!("删除堆栈信息出错：{:?}", err));
     Ok(true)
 }
 

@@ -10,3 +10,4 @@ tantivy.workspace = true
 regex.workspace = true
 fxhash.workspace = true
 once_cell.workspace=true
+cached.workspace=true
