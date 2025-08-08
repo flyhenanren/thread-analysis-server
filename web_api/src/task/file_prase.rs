@@ -3,8 +3,7 @@ use storage::writer::{LocalWriter, Writer};
 use task::async_task::{AsyncTask, ExecuteContext};
 
 use common::{error::AnalysisError, file_utils, model::file_info::FileInfo};
-use db::{db_access::{db_file, db_worksapce}, workspace::DBFileWorkSpace};
-use domain::db::{db::ModelTransfer, db_file::DBSourceFile};
+use domain::db::{db::ModelTransfer, db_file::{self, DBSourceFile}, db_workspace::{self, DBFileWorkSpace}};
 use parser::parse::{CpuParser, MemoryParser, ParseFile, ThreadParser};
 use sqlx::{SqlitePool};
 
@@ -62,13 +61,13 @@ async fn analysis(pool: &SqlitePool, path: &str, context: &ExecuteContext) -> Re
     let files: Vec<FileInfo> = match file_type {
         1 => {
             work_space = DBFileWorkSpace::new(&path);
-            db_worksapce::add(pool, &work_space).await?;
+            db_workspace::add(pool, &work_space).await?;
             file_utils::extract_file(source_path, &work_space.id)
                 .unwrap_or_else(|e| panic!("读取文件时发生错误：{}", e))
         }
         _ => {
             work_space = DBFileWorkSpace::new(path);
-            db_worksapce::add(pool, &work_space).await?;
+            db_workspace::add(pool, &work_space).await?;
             context.update_progress(2.0, Some("解压".to_string())).await;
             file_utils::unzip_and_extract_file(source_path, &work_space.id)
                 .unwrap_or_else(|e| panic!("读取文件时发生错误：{}", e))
@@ -106,7 +105,7 @@ async fn analysis(pool: &SqlitePool, path: &str, context: &ExecuteContext) -> Re
 mod tests {
 
     use actix_web::dev::Path;
-    use db::connection::establish_connection;
+    use domain::db::db::establish_connection;
     use task::async_task::ExecuteContext;
 
     use super::analysis;

@@ -9,7 +9,6 @@ default-run="web-server"
 
 #模块依赖
 task = { path = "../task" }
-db = { path = "../db" }
 common = {path = "../common"}
 domain = {path = "../domain"}
 parser = {path = "../parser"}

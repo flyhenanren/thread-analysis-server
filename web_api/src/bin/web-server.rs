@@ -1,7 +1,6 @@
 use actix_web::{web, App, HttpServer};
-use db::connection::establish_connection;
 
-use domain::{config::{AppConfig, SharedConfig}, context::Context};
+use domain::{config::{AppConfig, SharedConfig}, context::Context, db::db::establish_connection};
 use task::async_task::TaskExecutor;
 use std::{io, net::ToSocketAddrs};
 use log::*;

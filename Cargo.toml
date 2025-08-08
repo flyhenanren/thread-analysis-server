@@ -1,7 +1,6 @@
 [workspace]
 members = [
   "domain",
-  "db",
   "dsl_engine",
   "indexer",
   "search",

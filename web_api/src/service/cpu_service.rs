@@ -1,6 +1,5 @@
 use common::error::AnalysisError;
-use db::db_access::db_cpu;
-use domain::model::cpu::CpuCount;
+use domain::{db::db_cpu, model::cpu::CpuCount};
 use sqlx::SqlitePool;
 
 

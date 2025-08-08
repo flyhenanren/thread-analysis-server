@@ -1,14 +1,35 @@
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
 use common::error::DBError;
+use common::string_utils::rand_id;
+use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
 use sqlx::SqlitePool;
 
-use crate::workspace::DBFileWorkSpace;
+#[derive(Serialize, Deserialize, Debug, Clone, FromRow)]
+pub struct DBFileWorkSpace {
+    #[sqlx(rename = "ID")]
+    pub id: String,
+    #[sqlx(rename = "FILE_PATH")]
+    pub file_path: String,
+    #[sqlx(rename = "CREATE_TIME")]
+    pub create_time: NaiveDateTime,
+    #[sqlx(rename = "UPDATE_TIME")]
+    pub update_time: NaiveDateTime,
+}
 
-
+impl DBFileWorkSpace {
+    pub fn new(path: &str) -> Self {
+        DBFileWorkSpace {
+            id: rand_id(),
+            file_path: path.into(),
+            create_time: Utc::now().naive_utc(),
+            update_time: Utc::now().naive_utc(),
+        }
+    }
+}
 
 pub async fn add(pool: &SqlitePool, work_space: &DBFileWorkSpace) -> Result<(), DBError> {
-    sqlx::query(
-        r#"INSERT INTO FILE_WORKSPACE (ID, file_path) VALUES (?,?) "#)
+    sqlx::query(r#"INSERT INTO FILE_WORKSPACE (ID, file_path) VALUES (?,?) "#)
         .bind(work_space.id.to_string())
         .bind(work_space.file_path.to_string())
         .execute(pool)
@@ -32,7 +53,10 @@ pub async fn get(pool: &SqlitePool, id: &str) -> Result<Option<DBFileWorkSpace>,
     Ok(work_sapce)
 }
 
-pub async fn get_by_path(pool: &SqlitePool, path: &str) -> Result<Option<DBFileWorkSpace>, DBError> {
+pub async fn get_by_path(
+    pool: &SqlitePool,
+    path: &str,
+) -> Result<Option<DBFileWorkSpace>, DBError> {
     let work_space =
         sqlx::query_as::<_, DBFileWorkSpace>("SELECT * FROM FILE_WORKSPACE WHERE FILE_PATH = ?")
             .bind(path)
@@ -55,7 +79,7 @@ pub async fn delete_all(pool: &SqlitePool) -> Result<(), DBError> {
         .await?;
     Ok(())
 }
-pub async fn update_time(pool: &SqlitePool, id: i32, time:NaiveDateTime) -> Result<(), DBError> {
+pub async fn update_time(pool: &SqlitePool, id: i32, time: NaiveDateTime) -> Result<(), DBError> {
     sqlx::query("UPDATE FILE_WORKSPACE SET update_time = $1 WHERE ID = $2")
         .bind(time)
         .bind(id)

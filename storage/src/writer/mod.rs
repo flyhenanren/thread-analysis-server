@@ -2,8 +2,7 @@
 use std::collections::HashMap;
 
 use common::{error::AnalysisError};
-use db::db_access::{db_cpu, db_memeory, db_thread};
-use domain::{db::{db::ModelTransfer, db_cpu::DBCpu, db_memory::DBMemory, db_thread::DBThreadInfo}, model::{cpu::Cpu, memory::MemoryValue, thread::Thread}};
+use domain::{db::{db::ModelTransfer, db_cpu::{self, DBCpu}, db_memory::{self, DBMemory}, db_thread::{self, DBThreadInfo}}, model::{cpu::Cpu, memory::MemoryValue, thread::Thread}};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sqlx::SqlitePool;
 
@@ -65,7 +64,7 @@ impl Writer for DBWriter {
     }
 
     async fn write_memory(pool: &SqlitePool,workspace_id: &str, memory_info: &Vec<MemoryValue>) -> Result<(), AnalysisError> {
-        db_memeory::batch_add(
+        db_memory::batch_add(
         pool,
         &memory_info
             .into_iter()

@@ -769,22 +769,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "db"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "common",
- "domain",
- "dotenv",
- "futures",
- "num_cpus",
- "serde",
- "serde_json",
- "sqlx",
- "tokio",
-]
-
-[[package]]
 name = "deflate64"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -873,13 +857,16 @@ dependencies = [
  "common",
  "config",
  "dotenv",
+ "futures",
  "indexer",
  "lazy_static",
+ "num_cpus",
  "rayon",
  "regex",
  "serde",
  "serde_json",
  "sqlx",
+ "tokio",
 ]
 
 [[package]]
@@ -2613,7 +2600,6 @@ name = "storage"
 version = "0.1.0"
 dependencies = [
  "common",
- "db",
  "domain",
  "log",
  "rayon",
@@ -3200,7 +3186,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "common",
- "db",
  "domain",
  "dotenv",
  "fern",

@@ -1,7 +1,7 @@
 
 use actix_web::{web, HttpResponse};
 use common::error::AnalysisError;
-use db::db_access::db_cpu;
+use domain::db::db_cpu;
 
 use crate::{service::cpu_service, state::AppState};
 
